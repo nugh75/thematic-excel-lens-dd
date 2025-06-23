@@ -464,7 +464,7 @@ const colors = [
       </Card>
 
       <Dialog open={isLabelingOpen} onOpenChange={setIsLabelingOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5" />
@@ -472,7 +472,7 @@ const colors = [
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto max-h-[calc(85vh-120px)] pr-2">
             <div className="p-3 bg-muted/50 rounded-lg">
               {labelingType === 'cell' && selectedCell ? (
                 <>
@@ -575,9 +575,9 @@ const colors = [
                   Nessuna etichetta disponibile. Crea prima delle etichette.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2">
                   {labels.map(label => (
-                    <div key={label.id} className="flex items-center space-x-3 p-2 border rounded-lg">
+                    <div key={label.id} className="flex items-center space-x-3 p-2 border rounded-lg hover:bg-muted/50">
                       <Checkbox
                         id={label.id}
                         checked={selectedLabels.includes(label.id)}
@@ -602,7 +602,9 @@ const colors = [
                 </div>
               )}
             </div>
-            
+          </div>
+          
+          <div className="flex gap-2 pt-4 border-t">
             <Button 
               onClick={() => setIsLabelingOpen(false)}
               className="w-full"

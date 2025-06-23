@@ -1,3 +1,10 @@
+import { robustAIPipeline, type AIProcessingResult } from './robustAIPipeline';
+import { 
+  LABEL_GENERATION_TEMPLATE, 
+  LABEL_SUGGESTION_TEMPLATE, 
+  GENERAL_ADVICE_TEMPLATE 
+} from './aiPromptTemplates';
+
 export interface AIModel {
   name: string;
   id: string;
@@ -299,11 +306,15 @@ class AIService {
         model: this.settings.selectedModel,
         messages: [
           {
+            role: 'system',
+            content: 'Sei un assistente specializzato in analisi tematica qualitativa. Rispondi sempre e solo in formato JSON valido, senza testo aggiuntivo prima o dopo il JSON.'
+          },
+          {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 1000
       }),
     });
@@ -336,11 +347,15 @@ class AIService {
         model: this.settings.selectedModel,
         messages: [
           {
+            role: 'system',
+            content: 'Sei un assistente specializzato in analisi tematica qualitativa. Rispondi sempre e solo in formato JSON valido, senza testo aggiuntivo prima o dopo il JSON.'
+          },
+          {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 1000
       }),
     });
@@ -381,7 +396,7 @@ Per ogni etichetta fornisci:
 - Livello di confidenza (0-100)
 - Ragionamento per la scelta
 
-Rispondi in formato JSON:
+IMPORTANTE: Rispondi SOLO con JSON valido, senza testo aggiuntivo prima o dopo. Il formato deve essere esattamente:
 {
   "suggestions": [
     {
@@ -398,23 +413,27 @@ Rispondi in formato JSON:
     try {
       const response = await this.generateCompletion(prompt);
       
-      // Prova a parsare la risposta JSON
-      try {
-        const parsed = JSON.parse(response);
+      // Debug: mostra la risposta raw
+      console.log('Risposta AI raw:', response);
+      
+      // Usa la funzione di parsing robusta
+      const parsed = this.parseAIResponse(response);
+      
+      if (parsed && parsed.suggestions) {
         return parsed;
-      } catch (parseError) {
-        // Se il parsing fallisce, crea una risposta di fallback
-        console.warn('Risposta AI non in formato JSON valido:', response);
+      } else {
+        // Se il parsing fallisce completamente, crea una risposta di fallback
+        console.warn('Risposta AI non valida, creo fallback con contenuto estratto');
         return {
           suggestions: [
             {
-              name: "Suggerimento AI",
-              description: response.substring(0, 200) + "...",
-              confidence: 50,
-              reasoning: "Risposta AI elaborata ma non strutturata"
+              name: "Tema Identificato",
+              description: response.substring(0, 150) + "...",
+              confidence: 60,
+              reasoning: "Contenuto estratto dalla risposta AI non strutturata"
             }
           ],
-          generalAdvice: "Rivedi le risposte manualmente per identificare pattern tematici."
+          generalAdvice: "La risposta AI non era in formato JSON. Considera di riformulare il prompt o riprovare."
         };
       }
     } catch (error) {
@@ -440,6 +459,137 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
       console.error('Errore consiglio AI:', error);
       throw error;
     }
+  }
+
+  /**
+   * Genera etichette usando la pipeline robusta
+   */
+  async generateLabelsRobust(
+    userPrompt: string,
+    responses: string[],
+    existingLabels: string[]
+  ): Promise<AIProcessingResult<AISuggestionResponse>> {
+    console.log('🚀 Avvio generazione etichette con pipeline robusta');
+    
+    const promptData = {
+      userPrompt,
+      responses: responses.slice(0, 30).map((resp, i) => `${i + 1}. ${resp}`).join('\n'),
+      existingLabels: existingLabels.join(', ')
+    };
+
+    return await robustAIPipeline.processWithRetry<AISuggestionResponse>(
+      this,
+      LABEL_GENERATION_TEMPLATE,
+      promptData,
+      { maxAttempts: 3, delayMs: 1500 }
+    );
+  }
+
+  /**
+   * Suggerisce etichette esistenti usando la pipeline robusta
+   */
+  async suggestExistingLabelsRobust(
+    availableLabels: any[],
+    responsesToAnalyze: any[]
+  ): Promise<AIProcessingResult<{ suggestions: any[] }>> {
+    console.log('🚀 Avvio suggerimenti etichette con pipeline robusta');
+    
+    const labelsDescriptions = availableLabels.map(l => 
+      `ID: ${l.id} | Nome: ${l.name} | Descrizione: ${l.description || 'N/A'}`
+    ).join('\n');
+
+    const responsesText = responsesToAnalyze.map(r => 
+      `${r.index}: "${r.text}"`
+    ).join('\n');
+
+    const promptData = {
+      availableLabels: labelsDescriptions,
+      responsesToAnalyze: responsesText
+    };
+
+    return await robustAIPipeline.processWithRetry<{ suggestions: any[] }>(
+      this,
+      LABEL_SUGGESTION_TEMPLATE,
+      promptData,
+      { maxAttempts: 3, delayMs: 1000 }
+    );
+  }
+
+  /**
+   * Genera consigli generali usando la pipeline robusta
+   */
+  async getGeneralAdviceRobust(
+    context: string, 
+    question: string
+  ): Promise<AIProcessingResult<{ advice: string; suggestions?: string[] }>> {
+    console.log('🚀 Avvio generazione consigli con pipeline robusta');
+    
+    const promptData = { context, question };
+
+    return await robustAIPipeline.processWithRetry<{ advice: string; suggestions?: string[] }>(
+      this,
+      GENERAL_ADVICE_TEMPLATE,
+      promptData,
+      { maxAttempts: 2, delayMs: 1000 }
+    );
+  }
+
+  // Funzione helper per parsing JSON più robusto
+  private parseAIResponse(response: string): any {
+    console.log('Tentativo parsing risposta AI:', response);
+    
+    // Prima prova: parsing diretto
+    try {
+      return JSON.parse(response);
+    } catch (error) {
+      console.log('Parsing diretto fallito, provo estrazione JSON...');
+    }
+
+    // Seconda prova: estrazione di JSON dal testo
+    // Cerca il primo { e l'ultimo } bilanciato
+    const firstBrace = response.indexOf('{');
+    if (firstBrace !== -1) {
+      let braceCount = 0;
+      let lastBrace = firstBrace;
+      
+      for (let i = firstBrace; i < response.length; i++) {
+        if (response[i] === '{') braceCount++;
+        if (response[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            lastBrace = i;
+            break;
+          }
+        }
+      }
+      
+      const jsonStr = response.substring(firstBrace, lastBrace + 1);
+      try {
+        console.log('JSON estratto:', jsonStr);
+        return JSON.parse(jsonStr);
+      } catch (error) {
+        console.log('Parsing JSON estratto fallito:', error);
+      }
+    }
+
+    // Terza prova: parsing con regex per rimuovere caratteri problematici
+    try {
+      // Rimuovi possibili caratteri markdown o di formattazione
+      const cleaned = response
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .replace(/^\s*[\r\n]/gm, '')
+        .trim();
+      
+      console.log('JSON pulito:', cleaned);
+      return JSON.parse(cleaned);
+    } catch (error) {
+      console.log('Parsing JSON pulito fallito:', error);
+    }
+
+    // Se tutto fallisce, restituisci null
+    console.error('Impossibile parsare risposta AI come JSON:', response);
+    return null;
   }
 }
 

@@ -414,9 +414,9 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
                   Nessuna etichetta disponibile. Crea prima delle etichette.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2">
                   {labels.map(label => (
-                    <div key={label.id} className="flex items-center space-x-3 p-2 border rounded-lg">
+                    <div key={label.id} className="flex items-center space-x-3 p-2 border rounded-lg hover:bg-muted/50">
                       <Checkbox
                         id={`label-${label.id}`}
                         checked={selectedLabels.includes(label.id)}

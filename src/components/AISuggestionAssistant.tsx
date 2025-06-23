@@ -71,42 +71,16 @@ export function AISuggestionAssistant() {
       // Analizza solo le prime 10 risposte per evitare sovraccarico
       const samplesToAnalyze = responses.slice(0, 10);
 
-      const labelsDescriptions = labels.map(l => 
-        `ID: ${l.id} | Nome: ${l.name} | Descrizione: ${l.description || 'N/A'}`
-      ).join('\n');
-
-      const responsesToAnalyze = samplesToAnalyze.map(r => 
-        `${r.index}: "${r.text}"`
-      ).join('\n');
-
-      const prompt = `
-Sei un assistente per l'analisi tematica qualitativa. Analizza le seguenti risposte e suggerisci quale delle etichette esistenti è più appropriata per ogni risposta.
-
-ETICHETTE DISPONIBILI:
-${labelsDescriptions}
-
-RISPOSTE DA ANALIZZARE:
-${responsesToAnalyze}
-
-Per ogni risposta, suggerisci l'etichetta più appropriata basandoti sul contenuto e sul significato.
-
-Rispondi in formato JSON:
-{
-  "suggestions": [
-    {
-      "responseIndex": 0,
-      "suggestedLabelId": "id_etichetta",
-      "confidence": 85,
-      "reasoning": "Breve spiegazione del perché questa etichetta è appropriata"
-    }
-  ]
-}`;
-
-      const response = await aiService.generateCompletion(prompt);
+      console.log('🚀 Avvio analisi AI con pipeline robusta');
       
-      try {
-        const parsed = JSON.parse(response);
-        const suggestionsWithText = (parsed.suggestions || [])
+      // Usa la pipeline robusta
+      const result = await aiService.suggestExistingLabelsRobust(
+        labels,
+        samplesToAnalyze
+      );
+
+      if (result.success && result.data) {
+        const suggestionsWithText = (result.data.suggestions || [])
           .map((s: any) => {
             const responseData = samplesToAnalyze.find(r => r.index === s.responseIndex);
             return responseData ? {
@@ -120,11 +94,11 @@ Rispondi in formato JSON:
         setSuggestions(suggestionsWithText);
         
         toast({
-          title: "Analisi completata",
-          description: `L'AI ha analizzato ${suggestionsWithText.length} risposte e fornito suggerimenti.`,
+          title: "Analisi completata con successo! 🎉",
+          description: `L'AI ha analizzato ${suggestionsWithText.length} risposte dopo ${result.attempts} tentativo/i.`,
         });
-      } catch (parseError) {
-        throw new Error('Risposta AI non valida. Riprova.');
+      } else {
+        throw new Error(result.error || 'La pipeline robusta non è riuscita ad analizzare le risposte');
       }
     } catch (err: any) {
       console.error('Errore analisi AI:', err);

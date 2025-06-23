@@ -10,12 +10,19 @@ import { Loader2, Sparkles, Plus, Brain, CheckCircle } from 'lucide-react';
 import { aiService, type LabelSuggestion } from '../services/aiService';
 import { useAnalysisStore } from '../store/analysisStore';
 import { useToast } from '../hooks/use-toast';
+import AIPipelineStatus from './AIPipelineStatus';
 
 export function AILabelGenerator() {
   const [selectedColumn, setSelectedColumn] = useState<string>('');
   const [userPrompt, setUserPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<(LabelSuggestion & { selected: boolean })[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pipelineState, setPipelineState] = useState({
+    currentAttempt: 1,
+    maxAttempts: 3,
+    stage: '',
+    success: false
+  });
   const [error, setError] = useState<string>('');
   const { excelData, labels, addLabel } = useAnalysisStore();
   const { toast } = useToast();
@@ -50,6 +57,12 @@ export function AILabelGenerator() {
     setIsGenerating(true);
     setError('');
     setSuggestions([]);
+    setPipelineState({
+      currentAttempt: 1,
+      maxAttempts: 3,
+      stage: 'Preparazione dei dati...',
+      success: false
+    });
 
     try {
       const columnIndex = excelData?.headers.findIndex(h => h === selectedColumn) ?? -1;
@@ -66,35 +79,27 @@ export function AILabelGenerator() {
         throw new Error('Nessuna risposta trovata nella colonna selezionata');
       }
 
-      const customPrompt = `
-${userPrompt}
-
-Analizza le seguenti risposte e crea 5-8 etichette tematiche specifiche basate sulla richiesta dell'utente.
-
-Risposte da analizzare:
-${responses.slice(0, 30).map((resp, i) => `${i + 1}. ${resp}`).join('\n')}
-
-Etichette già esistenti nel progetto (evita duplicati):
-${labels.map(l => l.name).join(', ')}
-
-Rispondi in formato JSON:
-{
-  "suggestions": [
-    {
-      "name": "Nome Etichetta",
-      "description": "Descrizione dettagliata dell'etichetta e quando usarla",
-      "confidence": 85,
-      "reasoning": "Ragionamento basato sui dati analizzati e il prompt dell'utente"
-    }
-  ],
-  "generalAdvice": "Consigli per l'uso di queste etichette nell'analisi"
-}`;
-
-      const response = await aiService.generateCompletion(customPrompt);
+      console.log('🚀 Avvio generazione etichette con pipeline robusta');
+      const existingLabelNames = labels.map(l => l.name);
       
-      try {
-        const parsed = JSON.parse(response);
-        const suggestionsWithSelection = (parsed.suggestions || []).map((s: LabelSuggestion) => ({
+      setPipelineState(prev => ({ ...prev, stage: 'Invio richiesta all\'AI...' }));
+      
+      // Usa la pipeline robusta
+      const result = await aiService.generateLabelsRobust(
+        userPrompt,
+        responses,
+        existingLabelNames
+      );
+
+      if (result.success && result.data) {
+        setPipelineState(prev => ({ 
+          ...prev, 
+          stage: 'Elaborazione completata!',
+          success: true,
+          currentAttempt: result.attempts 
+        }));
+
+        const suggestionsWithSelection = (result.data.suggestions || []).map((s: LabelSuggestion) => ({
           ...s,
           selected: false
         }));
@@ -102,15 +107,16 @@ Rispondi in formato JSON:
         setSuggestions(suggestionsWithSelection);
         
         toast({
-          title: "Etichette generate",
-          description: `L'AI ha generato ${suggestionsWithSelection.length} etichette basate sul tuo prompt.`,
+          title: "Etichette generate con successo! 🎉",
+          description: `L'AI ha generato ${suggestionsWithSelection.length} etichette dopo ${result.attempts} tentativo/i.`,
         });
-      } catch (parseError) {
-        throw new Error('Risposta AI non valida. Riprova con un prompt diverso.');
+      } else {
+        throw new Error(result.error || 'La pipeline robusta non è riuscita a generare etichette valide');
       }
     } catch (err: any) {
       console.error('Errore generazione etichette:', err);
       setError(err.message || 'Errore durante la generazione delle etichette.');
+      setPipelineState(prev => ({ ...prev, stage: 'Errore nella pipeline' }));
     } finally {
       setIsGenerating(false);
     }
@@ -183,17 +189,27 @@ Rispondi in formato JSON:
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5" />
-          Generatore AI di Etichette
-        </CardTitle>
-        <CardDescription>
-          Utilizza l'AI per generare automaticamente etichette personalizzate basate sui tuoi dati
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="space-y-4">
+      <AIPipelineStatus
+        isProcessing={isGenerating}
+        currentAttempt={pipelineState.currentAttempt}
+        maxAttempts={pipelineState.maxAttempts}
+        stage={pipelineState.stage}
+        error={error}
+        success={pipelineState.success}
+      />
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            Generatore AI di Etichette
+          </CardTitle>
+          <CardDescription>
+            Utilizza l'AI per generare automaticamente etichette personalizzate basate sui tuoi dati
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
         {/* Selezione colonna */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Colonna da analizzare:</label>
@@ -345,5 +361,6 @@ Rispondi in formato JSON:
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

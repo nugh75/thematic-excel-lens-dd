@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Merge, Trash2, Tag, Save, X } from 'lucide-react';
+import { Plus, Edit, Merge, Trash2, Tag, Save, X, Search } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
 
@@ -25,6 +26,7 @@ const LabelManagerAdvanced = () => {
   const [isMerging, setIsMerging] = useState(false);
   const [selectedLabelsForMerge, setSelectedLabelsForMerge] = useState<string[]>([]);
   const [targetLabelForMerge, setTargetLabelForMerge] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [newLabel, setNewLabel] = useState({
     name: '',
@@ -39,6 +41,26 @@ const LabelManagerAdvanced = () => {
   });
 
   const labelStats = getLabelStats();
+
+  // Filtra le etichette in base al termine di ricerca
+  const filteredLabels = labels.filter(label => 
+    label.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (label.description && label.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Funzione per evidenziare i termini di ricerca
+  const highlightSearchTerm = (text: string, term: string) => {
+    if (!term) return text;
+    const regex = new RegExp(`(${term})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, index) => 
+      regex.test(part) ? (
+        <span key={index} className="bg-yellow-200 text-yellow-900 px-1 rounded">
+          {part}
+        </span>
+      ) : part
+    );
+  };
 
   const handleCreateLabel = () => {
     if (!newLabel.name.trim()) {
@@ -200,57 +222,65 @@ const LabelManagerAdvanced = () => {
                     </Button>
                   </DialogTrigger>
                   
-                  <DialogContent>
+                  <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Crea Nuova Etichetta</DialogTitle>
                     </DialogHeader>
                     
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="name">Nome *</Label>
-                        <Input
-                          id="name"
-                          value={newLabel.name}
-                          onChange={(e) => setNewLabel(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="Nome dell'etichetta"
-                        />
+                    <div className="space-y-6 py-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Nome *</Label>
+                          <Input
+                            id="name"
+                            value={newLabel.name}
+                            onChange={(e) => setNewLabel(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Nome dell'etichetta"
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Colore</Label>
+                          <div className="flex flex-wrap gap-2 p-2 border rounded-md">
+                            {colors.map(color => (
+                              <button
+                                key={color}
+                                className={`w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform ${
+                                  newLabel.color === color ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                                }`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => setNewLabel(prev => ({ ...prev, color }))}
+                                title={`Colore ${color}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                       
-                      <div>
+                      <div className="space-y-2">
                         <Label htmlFor="description">Descrizione</Label>
                         <Textarea
                           id="description"
                           value={newLabel.description}
                           onChange={(e) => setNewLabel(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Descrizione opzionale"
+                          placeholder="Descrizione opzionale dell'etichetta (es. quando utilizzarla, criteri di applicazione...)"
+                          className="min-h-[80px] resize-none"
                         />
                       </div>
                       
-                      <div>
-                        <Label>Colore</Label>
-                        <div className="flex gap-2 mt-2">
-                          {colors.map(color => (
-                            <button
-                              key={color}
-                              className={`w-8 h-8 rounded-full border-2 ${
-                                newLabel.color === color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
-                              }`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => setNewLabel(prev => ({ ...prev, color }))}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button onClick={handleCreateLabel} className="flex-1">
+                      <div className="flex gap-3 pt-4 border-t">
+                        <Button onClick={handleCreateLabel} className="flex-1" size="lg">
+                          <Plus className="h-4 w-4 mr-2" />
                           Crea Etichetta
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => setIsCreating(false)}
                           className="flex-1"
+                          size="lg"
                         >
+                          <X className="h-4 w-4 mr-2" />
                           Annulla
                         </Button>
                       </div>
@@ -311,135 +341,227 @@ const LabelManagerAdvanced = () => {
         )}
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="p-6">
         {labels.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Tag className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Nessuna etichetta creata ancora</p>
-            <p className="text-sm">Inizia creando la tua prima etichetta</p>
+          <div className="text-center py-12 text-muted-foreground">
+            <Tag className="h-16 w-16 mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Nessuna etichetta creata ancora</h3>
+            <p className="text-sm mb-4">Inizia creando la tua prima etichetta per categorizzare i dati</p>
+            <Button onClick={() => setIsCreating(true)} size="lg">
+              <Plus className="h-4 w-4 mr-2" />
+              Crea Prima Etichetta
+            </Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {labels.map(label => (
-              <div key={label.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
-                <div className="flex items-center gap-3">
-                  {isMerging && (
-                    <Checkbox
-                      checked={selectedLabelsForMerge.includes(label.id)}
-                      onCheckedChange={() => toggleLabelForMerge(label.id)}
-                    />
-                  )}
-                  <div 
-                    className="w-4 h-4 rounded-full border" 
-                    style={{ backgroundColor: label.color }}
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{label.name}</span>
-                      <Badge variant="secondary">
-                        {labelStats[label.id] || 0} celle
-                      </Badge>
-                    </div>
-                    {label.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {label.description}
-                      </p>
-                    )}
+          <div className="space-y-4">
+            {/* Header con statistiche e ricerca */}
+            <div className="space-y-4 pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{labels.length}</span> etichette totali
                   </div>
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {Object.values(labelStats).reduce((a, b) => a + b, 0)}
+                    </span> applicazioni totali
+                  </div>
+                  {searchTerm && (
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{filteredLabels.length}</span> risultati
+                    </div>
+                  )}
                 </div>
-                
-                {!isMerging && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditLabel(label.id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+              </div>
+
+              {/* Barra di ricerca - visibile solo se ci sono più di 5 etichette */}
+              {labels.length > 5 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca etichette per nome o descrizione..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Container con scroll per le etichette */}
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="space-y-3">
+                {filteredLabels.length === 0 && searchTerm ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="font-medium">Nessun risultato trovato</p>
+                    <p className="text-sm">Prova con termini di ricerca diversi</p>
+                  </div>
+                ) : (
+                  filteredLabels.map(label => (
+                <div key={label.id} className="group p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {isMerging && (
+                        <div className="pt-1">
+                          <Checkbox
+                            checked={selectedLabelsForMerge.includes(label.id)}
+                            onCheckedChange={() => toggleLabelForMerge(label.id)}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex-shrink-0 pt-1">
+                        <div 
+                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm" 
+                          style={{ backgroundColor: label.color }}
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h4 className="font-medium truncate">
+                            {highlightSearchTerm(label.name, searchTerm)}
+                          </h4>
+                          <Badge variant="secondary" className="shrink-0">
+                            {labelStats[label.id] || 0} {(labelStats[label.id] || 0) === 1 ? 'cella' : 'celle'}
+                          </Badge>
+                        </div>
+                        
+                        {label.description && (
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {highlightSearchTerm(label.description, searchTerm)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {!isMerging && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleEditLabel(label.id)}
+                          className="hover:bg-primary/10"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Elimina Etichetta</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Sei sicuro di voler eliminare l'etichetta "{label.name}"? 
-                            Questa azione rimuoverà l'etichetta da tutte le celle e righe e non può essere annullata.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annulla</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => handleDeleteLabel(label.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Elimina
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Elimina Etichetta</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Sei sicuro di voler eliminare l'etichetta <strong>"{label.name}"</strong>? 
+                                <br/><br/>
+                                Questa azione:
+                                <ul className="list-disc list-inside mt-2 space-y-1">
+                                  <li>Rimuoverà l'etichetta da tutte le {labelStats[label.id] || 0} celle associate</li>
+                                  <li>Non può essere annullata</li>
+                                </ul>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteLabel(label.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Elimina Definitivamente
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </div>
+                </div>
+              ))
                 )}
               </div>
-            ))}
+            </ScrollArea>
+
+            {/* Footer con azioni rapide se non in modalità merge */}
+            {!isMerging && labels.length > 5 && (
+              <div className="pt-4 border-t text-center">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Gestisci facilmente le tue {labels.length} etichette
+                </p>
+                <div className="flex justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsCreating(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuova
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsMerging(true)}>
+                    <Merge className="h-4 w-4 mr-1" />
+                    Unisci
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
 
       {/* Dialog per modifica etichetta */}
       <Dialog open={editingLabel !== null} onOpenChange={(open) => !open && setEditingLabel(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Modifica Etichetta</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Nome *</Label>
-              <Input
-                id="edit-name"
-                value={editLabel.name}
-                onChange={(e) => setEditLabel(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nome dell'etichetta"
-              />
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome *</Label>
+                <Input
+                  id="edit-name"
+                  value={editLabel.name}
+                  onChange={(e) => setEditLabel(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome dell'etichetta"
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Colore</Label>
+                <div className="flex flex-wrap gap-2 p-2 border rounded-md">
+                  {colors.map(color => (
+                    <button
+                      key={color}
+                      className={`w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform ${
+                        editLabel.color === color ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setEditLabel(prev => ({ ...prev, color }))}
+                      title={`Colore ${color}`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
             
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="edit-description">Descrizione</Label>
               <Textarea
                 id="edit-description"
                 value={editLabel.description}
                 onChange={(e) => setEditLabel(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrizione opzionale"
+                placeholder="Descrizione opzionale dell'etichetta (es. quando utilizzarla, criteri di applicazione...)"
+                className="min-h-[80px] resize-none"
               />
             </div>
             
-            <div>
-              <Label>Colore</Label>
-              <div className="flex gap-2 mt-2">
-                {colors.map(color => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full border-2 ${
-                      editLabel.color === color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setEditLabel(prev => ({ ...prev, color }))}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button onClick={handleUpdateLabel} className="flex-1">
+            <div className="flex gap-3 pt-4 border-t">
+              <Button onClick={handleUpdateLabel} className="flex-1" size="lg">
                 <Save className="h-4 w-4 mr-2" />
                 Salva Modifiche
               </Button>
@@ -447,6 +569,7 @@ const LabelManagerAdvanced = () => {
                 variant="outline"
                 onClick={() => setEditingLabel(null)}
                 className="flex-1"
+                size="lg"
               >
                 <X className="h-4 w-4 mr-2" />
                 Annulla
