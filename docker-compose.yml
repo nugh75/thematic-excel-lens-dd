@@ -1,0 +1,118 @@
+services:
+  # Applicazione principale
+  thematic-excel-lens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: thematic-excel-lens-app
+    ports:
+      - "${APP_PORT:-3007}:80"
+    env_file:
+      - .env
+    environment:
+      # Variabili d'ambiente per l'applicazione
+      - NODE_ENV=${NODE_ENV:-production}
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      - VITE_APP_NAME=${VITE_APP_NAME:-AnaTema}
+      
+      # Configurazione file e funzionalità
+      - VITE_MAX_FILE_SIZE=${VITE_MAX_FILE_SIZE:-50MB}
+      - VITE_ALLOWED_FILE_TYPES=${VITE_ALLOWED_FILE_TYPES:-xlsx,xls,csv}
+      - VITE_ENABLE_ANALYTICS=${VITE_ENABLE_ANALYTICS:-true}
+      - VITE_AUTO_SAVE_INTERVAL=${VITE_AUTO_SAVE_INTERVAL:-30000}
+    volumes:
+      # Volume persistente per i dati dell'applicazione
+      - app_data:/app/data
+      # Volume per i file temporanei e cache
+      - temp_data:/tmp/app
+      # Volume per i log (opzionale)
+      - ./logs:/var/log/nginx
+    restart: unless-stopped
+    networks:
+      - thematic_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database Redis per cache e sessioni (opzionale)
+  redis:
+    image: redis:7-alpine
+    container_name: thematic-excel-lens-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    volumes:
+      # Volume persistente per Redis
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - thematic_network
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+
+  # Servizio di backup automatico (opzionale)
+  backup:
+    image: alpine:latest
+    container_name: thematic-excel-lens-backup
+    environment:
+      - BACKUP_INTERVAL=${BACKUP_INTERVAL:-86400} # 24 ore in secondi
+      - BACKUP_RETENTION=${BACKUP_RETENTION:-7} # mantieni 7 backup
+    volumes:
+      - app_data:/source:ro
+      - ./backups:/backups
+    restart: unless-stopped
+    networks:
+      - thematic_network
+    command: >
+      sh -c "
+        while true; do
+          echo 'Creazione backup...'
+          tar -czf /backups/backup_$(date +%Y%m%d_%H%M%S).tar.gz -C /source .
+          echo 'Backup completato'
+          
+          echo 'Pulizia backup vecchi...'
+          ls -t /backups/backup_*.tar.gz | tail -n +$$((${BACKUP_RETENTION} + 1)) | xargs -r rm
+          
+          echo 'Prossimo backup tra ${BACKUP_INTERVAL} secondi'
+          sleep ${BACKUP_INTERVAL}
+        done
+      "
+
+# Volumi persistenti
+volumes:
+  # Volume principale per i dati dell'applicazione
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}
+  
+  # Volume per i dati Redis
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${REDIS_DATA_PATH:-./redis-data}
+  
+  # Volume per file temporanei
+  temp_data:
+    driver: local
+
+# Rete personalizzata
+networks:
+  thematic_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.0.0/16

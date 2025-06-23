@@ -1,0 +1,32 @@
+FROM node:18-alpine
+
+# Installa dipendenze di sistema e bun
+RUN apk add --no-cache git && \
+    npm install -g bun || echo "Fallback a npm"
+
+# Imposta la directory di lavoro
+WORKDIR /app
+
+# Copia i file di dipendenze
+COPY package.json ./
+COPY bun.lockb* ./
+COPY package-lock.json* ./
+
+# Installa le dipendenze con fallback
+RUN if [ -f "bun.lockb" ] && command -v bun >/dev/null 2>&1; then \
+        echo "Usando bun per installare dipendenze..."; \
+        bun install; \
+    else \
+        echo "Usando npm per installare dipendenze..."; \
+        npm install; \
+    fi
+
+# Espone la porta di sviluppo (dinamica tramite ENV)
+EXPOSE 8088
+
+# Comando di default per sviluppo con fallback
+CMD if command -v bun >/dev/null 2>&1; then \
+        bun run dev --host 0.0.0.0 --port ${PORT:-8088}; \
+    else \
+        npm run dev -- --host 0.0.0.0 --port ${PORT:-8088}; \
+    fi

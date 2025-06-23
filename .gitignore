@@ -14,10 +14,22 @@ dist-ssr
 
 # Environment variables (contiene chiavi API sensitive)
 .env
+.env.docker
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Docker volumes e dati persistenti
+redis-data/
+dev-data/
+data/
+backups/
+logs/
+
+# File di dump Redis
+*.rdb
+dump.rdb
 
 # Editor directories and files
 .vscode/*

@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, Tag, BarChart, Users, ArrowRight, CheckCircle } from 'lucide-react';
+import { FileSpreadsheet, Tag, Users, ArrowRight, CheckCircle, Bot } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
@@ -23,9 +23,9 @@ const Index = () => {
       color: "text-green-500"
     },
     {
-      icon: BarChart,
-      title: "Analisi Quantitative",
-      description: "Visualizza statistiche e grafici dell'analisi tematica",
+      icon: Bot,
+      title: "AI Assistant",
+      description: "Assistente intelligente per suggerimenti ed etichettatura automatica",
       color: "text-purple-500"
     },
     {
@@ -40,7 +40,7 @@ const Index = () => {
     "Carica il tuo file Excel con i dati qualitativi",
     "Crea etichette tematiche personalizzate",
     "Etichetta le celle con i temi identificati",
-    "Visualizza l'analisi quantitativa dei risultati"
+    "Esplora e analizza i pattern tematici"
   ];
 
   return (
@@ -49,15 +49,15 @@ const Index = () => {
       <div className="container mx-auto px-6 py-12">
         <div className="text-center mb-16 fade-in">
           <Badge variant="secondary" className="mb-4 text-sm">
-            Strumento Professionale per Ricercatori
+            Strumento Professionale con AI Assistant
           </Badge>
           <h1 className="text-5xl font-bold text-foreground mb-6">
-            Analisi Tematica
-            <span className="text-primary block mt-2">Qualitativa</span>
+            AnaTema
+            <span className="text-primary block mt-2 text-3xl">Analisi Tematica Qualitativa</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            Strumento avanzato per l'analisi tematica di dati qualitativi provenienti da file Excel. 
-            Crea etichette dinamiche, organizzale gerarchicamente e ottieni analisi quantitative dettagliate.
+            Strumento avanzato per l'analisi tematica di dati qualitativi con AI Assistant integrato. 
+            Crea etichette dinamiche, ottieni suggerimenti intelligenti e esplora i pattern tematici nei tuoi dati.
           </p>
           <Button 
             size="lg" 

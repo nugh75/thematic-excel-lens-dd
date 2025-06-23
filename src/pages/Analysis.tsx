@@ -88,15 +88,15 @@ const Analysis = () => {
           </div>
         ) : (
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="projects">Progetti</TabsTrigger>
-              <TabsTrigger value="config">Config</TabsTrigger>
-              <TabsTrigger value="data">Dati</TabsTrigger>
-              <TabsTrigger value="labels">Etichette</TabsTrigger>
-              <TabsTrigger value="analysis">Analisi</TabsTrigger>
-              <TabsTrigger value="ai-consultant">AI</TabsTrigger>
-              <TabsTrigger value="users">Utenti</TabsTrigger>
-              <TabsTrigger value="export">Export</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-8 gap-0.5">
+              <TabsTrigger value="projects" className="text-xs px-1">Progetti</TabsTrigger>
+              <TabsTrigger value="config" className="text-xs px-1">Config</TabsTrigger>
+              <TabsTrigger value="data" className="text-xs px-1">Dati</TabsTrigger>
+              <TabsTrigger value="labels" className="text-xs px-1">Etichette</TabsTrigger>
+              <TabsTrigger value="analysis" className="text-xs px-1">Analisi</TabsTrigger>
+              <TabsTrigger value="ai-consultant" className="text-xs px-1">AI</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs px-1">Utenti</TabsTrigger>
+              <TabsTrigger value="export" className="text-xs px-1">Export</TabsTrigger>
             </TabsList>
             
             <TabsContent value="projects" className="space-y-6">

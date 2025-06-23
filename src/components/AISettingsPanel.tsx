@@ -24,16 +24,9 @@ export function AISettingsPanel() {
     }
   }, [settings.enabled, settings.provider, connectionStatus]);
 
-  // Auto-abilita AI se ci sono chiavi nelle variabili d'ambiente
+  // Rimuovo l'auto-abilitazione basata su variabili d'ambiente
   useEffect(() => {
-    const hasEnvKeys = import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_OPENAI_API_KEY;
-    if (hasEnvKeys && !settings.enabled) {
-      handleSettingsChange('enabled', true);
-      toast({
-        title: "AI abilitata automaticamente",
-        description: "Configurazione trovata nel file .env",
-      });
-    }
+    // Non abilitiamo più automaticamente l'AI
   }, []);
 
   const handleSettingsChange = (key: keyof AISettings, value: any) => {
@@ -119,23 +112,10 @@ export function AISettingsPanel() {
           Configurazione AI
         </CardTitle>
         <CardDescription>
-          Configura l'integrazione con OpenRouter (modelli gratuiti) o OpenAI (cloud premium)
+          Configura l'integrazione con OpenRouter (modelli gratuiti) o OpenAI (cloud premium). Inserisci le tue chiavi API direttamente nell'interfaccia.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Info sulle variabili d'ambiente */}
-        {(import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_OPENAI_API_KEY) && (
-          <Alert>
-            <Server className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Configurazione .env attiva:</strong> Le chiavi API sono gestite tramite variabili d'ambiente.
-              {import.meta.env.VITE_OPENROUTER_API_KEY && " OpenRouter configurato."}
-              {import.meta.env.VITE_OPENAI_API_KEY && " OpenAI configurato."}
-              {" "}Le chiavi non possono essere modificate dall'interfaccia.
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Abilitazione AI */}
         <div className="flex items-center space-x-2">
           <Switch
@@ -184,22 +164,14 @@ export function AISettingsPanel() {
             {/* Configurazione OpenRouter */}
             {settings.provider === 'openrouter' && (
               <div className="space-y-2">
-                <Label htmlFor="openrouter-key" className="flex items-center gap-2">
-                  API Key OpenRouter
-                  {import.meta.env.VITE_OPENROUTER_API_KEY && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                      Configurata nel .env
-                    </span>
-                  )}
-                </Label>
+                <Label htmlFor="openrouter-key">API Key OpenRouter</Label>
                 <div className="flex space-x-2">
                   <Input
                     id="openrouter-key"
                     type="password"
                     value={settings.openrouterApiKey}
                     onChange={(e) => handleSettingsChange('openrouterApiKey', e.target.value)}
-                    placeholder={import.meta.env.VITE_OPENROUTER_API_KEY ? "Configurata tramite .env" : "sk-or-..."}
-                    disabled={!!import.meta.env.VITE_OPENROUTER_API_KEY}
+                    placeholder="sk-or-..."
                   />
                   <Button
                     onClick={testConnection}
@@ -215,41 +187,27 @@ export function AISettingsPanel() {
                     Test
                   </Button>
                 </div>
-                {import.meta.env.VITE_OPENROUTER_API_KEY ? (
-                  <p className="text-xs text-green-600">
-                    ✓ Chiave API configurata nel file .env - Non modificabile dall'interfaccia
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Crea un account gratuito su{' '}
-                    <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="underline">
-                      openrouter.ai
-                    </a>{' '}
-                    per ottenere la tua API key gratuita
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  Crea un account gratuito su{' '}
+                  <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="underline">
+                    openrouter.ai
+                  </a>{' '}
+                  per ottenere la tua API key gratuita
+                </p>
               </div>
             )}
 
             {/* Configurazione OpenAI */}
             {settings.provider === 'openai' && (
               <div className="space-y-2">
-                <Label htmlFor="openai-key" className="flex items-center gap-2">
-                  API Key OpenAI
-                  {import.meta.env.VITE_OPENAI_API_KEY && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                      Configurata nel .env
-                    </span>
-                  )}
-                </Label>
+                <Label htmlFor="openai-key">API Key OpenAI</Label>
                 <div className="flex space-x-2">
                   <Input
                     id="openai-key"
                     type="password"
                     value={settings.openaiApiKey}
                     onChange={(e) => handleSettingsChange('openaiApiKey', e.target.value)}
-                    placeholder={import.meta.env.VITE_OPENAI_API_KEY ? "Configurata tramite .env" : "sk-..."}
-                    disabled={!!import.meta.env.VITE_OPENAI_API_KEY}
+                    placeholder="sk-..."
                   />
                   <Button
                     onClick={testConnection}
@@ -265,18 +223,12 @@ export function AISettingsPanel() {
                     Test
                   </Button>
                 </div>
-                {import.meta.env.VITE_OPENAI_API_KEY ? (
-                  <p className="text-xs text-green-600">
-                    ✓ Chiave API configurata nel file .env - Non modificabile dall'interfaccia
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Ottieni la tua API key da{' '}
-                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">
-                      platform.openai.com
-                    </a>
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  Ottieni la tua API key da{' '}
+                  <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">
+                    platform.openai.com
+                  </a>
+                </p>
               </div>
             )}
 

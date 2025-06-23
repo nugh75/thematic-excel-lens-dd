@@ -1,0 +1,75 @@
+services:
+     environment:
+      - NODE_ENV=development
+      - PORT=8088
+      - VITE_HOST=0.0.0.0
+      - VITE_PORT=8088
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      - VITE_APP_NAME=${VITE_APP_NAME:-AnaTema (Dev)} in modalità sviluppo
+  thematic-excel-lens-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: thematic-excel-lens-dev
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - PORT=8088
+      - VITE_HOST=0.0.0.0
+      - VITE_PORT=8088
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      - VITE_APP_NAME=${VITE_APP_NAME:-AnaTema (Dev)}
+      
+      # Configurazione AI per sviluppo - Override dalle variabili d'ambiente
+      - VITE_OPENROUTER_API_KEY=${VITE_OPENROUTER_API_KEY}
+      - VITE_OPENAI_API_KEY=${VITE_OPENAI_API_KEY}
+      - VITE_DEFAULT_AI_PROVIDER=${VITE_DEFAULT_AI_PROVIDER:-openrouter}
+      - VITE_DEFAULT_OPENROUTER_MODEL=${VITE_DEFAULT_OPENROUTER_MODEL:-meta-llama/llama-3.1-8b-instruct:free}
+      - VITE_DEFAULT_OPENAI_MODEL=${VITE_DEFAULT_OPENAI_MODEL:-gpt-3.5-turbo}
+      - VITE_AI_ENABLED_DEFAULT=${VITE_AI_ENABLED_DEFAULT:-true}
+    volumes:
+      # Mount del codice sorgente per hot reload
+      - .:/app
+      - /app/node_modules
+      # Volume per i dati di sviluppo
+      - dev_data:/app/data
+    restart: unless-stopped
+    networks:
+      - thematic_dev_network
+    command: bun run dev --host 0.0.0.0 --port 8088
+
+  # Redis per sviluppo
+  redis-dev:
+    image: redis:7-alpine
+    container_name: thematic-excel-lens-redis-dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    networks:
+      - thematic_dev_network
+    command: redis-server --requirepass ${REDIS_PASSWORD:-Clasimdansin2025!!}
+
+# Volumi per sviluppo
+volumes:
+  dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./dev-data
+  
+  redis_dev_data:
+    driver: local
+
+# Rete per sviluppo
+networks:
+  thematic_dev_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

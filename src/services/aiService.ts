@@ -125,11 +125,11 @@ export const OPENAI_MODELS: AIModel[] = [
 
 class AIService {
   private settings: AISettings = {
-    provider: (import.meta.env.VITE_DEFAULT_AI_PROVIDER as AIProvider) || 'openrouter',
-    openrouterApiKey: import.meta.env.VITE_OPENROUTER_API_KEY || '',
-    openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-    selectedModel: import.meta.env.VITE_DEFAULT_OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free',
-    enabled: import.meta.env.VITE_AI_ENABLED_DEFAULT === 'true' || false
+    provider: 'openrouter',
+    openrouterApiKey: '',
+    openaiApiKey: '',
+    selectedModel: 'meta-llama/llama-3.1-8b-instruct:free',
+    enabled: false
   };
 
   constructor() {
@@ -140,13 +140,9 @@ class AIService {
     const saved = localStorage.getItem('ai-settings');
     if (saved) {
       const savedSettings = JSON.parse(saved);
-      // Mantieni le chiavi dalle variabili d'ambiente se quelle salvate sono vuote
       this.settings = { 
         ...this.settings, 
-        ...savedSettings,
-        // Priorità alle variabili d'ambiente per le chiavi API se non vuote
-        openrouterApiKey: savedSettings.openrouterApiKey || import.meta.env.VITE_OPENROUTER_API_KEY || '',
-        openaiApiKey: savedSettings.openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY || ''
+        ...savedSettings
       };
     }
     
@@ -173,12 +169,10 @@ class AIService {
     return { ...this.settings };
   }
 
-  // Funzione utile per debug - forza refresh delle impostazioni dalle variabili d'ambiente
-  refreshFromEnvironment() {
-    this.settings.openrouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || this.settings.openrouterApiKey;
-    this.settings.openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY || this.settings.openaiApiKey;
-    this.saveSettings();
-    console.log('Settings refreshed from environment');
+  // Funzione utile per debug - ricarica le impostazioni dal localStorage
+  refreshFromLocalStorage() {
+    this.loadSettings();
+    console.log('Settings refreshed from localStorage');
   }
 
   // Funzione per debug delle chiavi (senza mostrare la chiave completa)
