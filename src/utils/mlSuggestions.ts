@@ -40,10 +40,11 @@ export class MLSuggestionEngine {
   }
 
   suggestLabelsForCell(rowIndex: number, colIndex: number, excelData: any, labels: any[]): SuggestionResult[] {
-    const cellValue = excelData.rows[rowIndex]?.[colIndex]?.toString() || '';
+    const cellValue = excelData.rows[rowIndex]?.[colIndex];
+    const cellText = typeof cellValue === 'string' ? cellValue : String(cellValue || '');
     const suggestions: SuggestionResult[] = [];
     
-    if (!cellValue.trim()) return suggestions;
+    if (!cellText || !cellText.trim()) return suggestions;
     
     // Suggerimenti basati su pattern testuali
     this.labelPatterns.forEach((patterns, labelId) => {
@@ -51,7 +52,7 @@ export class MLSuggestionEngine {
       let bestMatch = '';
       
       patterns.forEach(pattern => {
-        const similarity = this.calculateTextSimilarity(cellValue, pattern);
+        const similarity = this.calculateTextSimilarity(cellText, pattern);
         if (similarity > maxSimilarity) {
           maxSimilarity = similarity;
           bestMatch = pattern;
@@ -69,7 +70,7 @@ export class MLSuggestionEngine {
     });
     
     // Suggerimenti basati su parole chiave
-    const keywordSuggestions = this.suggestByKeywords(cellValue, labels);
+    const keywordSuggestions = this.suggestByKeywords(cellText, labels);
     suggestions.push(...keywordSuggestions.map(s => ({
       ...s,
       cellId: `${rowIndex}-${colIndex}`
@@ -107,9 +108,11 @@ export class MLSuggestionEngine {
 
   suggestLabelsForRow(rowIndex: number, excelData: any, labels: any[]): SuggestionResult[] {
     const rowData = excelData.rows[rowIndex] || [];
-    const rowText = rowData.join(' ').toLowerCase();
+    const rowText = rowData.map(cell => {
+      return typeof cell === 'string' ? cell : String(cell || '');
+    }).join(' ').toLowerCase();
     
-    if (!rowText.trim()) return [];
+    if (!rowText || !rowText.trim()) return [];
     
     const suggestions = this.suggestByKeywords(rowText, labels);
     

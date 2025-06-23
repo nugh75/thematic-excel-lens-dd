@@ -1,15 +1,15 @@
-export interface OllamaModel {
+export interface AIModel {
   name: string;
-  size: number;
-  digest: string;
-  modified_at: string;
+  id: string;
+  description?: string;
+  free?: boolean;
 }
 
-export type AIProvider = 'ollama' | 'openai';
+export type AIProvider = 'openrouter' | 'openai';
 
 export interface AISettings {
   provider: AIProvider;
-  ollamaUrl: string;
+  openrouterApiKey: string;
   openaiApiKey: string;
   selectedModel: string;
   enabled: boolean;
@@ -28,32 +28,99 @@ export interface AISuggestionResponse {
 }
 
 // Modelli predefiniti per ogni provider
-export const OLLAMA_MODELS = [
-  'llama3',
-  'llama2',
-  'mistral',
-  'codellama',
-  'qwen2.5:7b',
-  'mixtral:8x7b',
-  'phi3',
-  'gemma2'
+export const OPENROUTER_FREE_MODELS: AIModel[] = [
+  {
+    name: 'Llama 3.1 8B (Free)',
+    id: 'meta-llama/llama-3.1-8b-instruct:free',
+    description: 'Modello Llama 3.1 8B gratuito',
+    free: true
+  },
+  {
+    name: 'Llama 3.2 3B (Free)',
+    id: 'meta-llama/llama-3.2-3b-instruct:free',
+    description: 'Modello Llama 3.2 3B gratuito',
+    free: true
+  },
+  {
+    name: 'Mistral 7B (Free)',
+    id: 'mistralai/mistral-7b-instruct:free',
+    description: 'Modello Mistral 7B gratuito',
+    free: true
+  },
+  {
+    name: 'Mistral Small 3.2 24B (Free)',
+    id: 'mistralai/mistral-small-3.2-24b-instruct:free',
+    description: 'Modello Mistral Small 3.2 24B gratuito - più potente',
+    free: true
+  },
+  {
+    name: 'DeepSeek Chat v3 (Free)',
+    id: 'deepseek/deepseek-chat-v3-0324:free',
+    description: 'Modello DeepSeek Chat v3 gratuito',
+    free: true
+  },
+  {
+    name: 'DeepSeek R1 0528 (Free)',
+    id: 'deepseek/deepseek-r1-0528:free',
+    description: 'Modello DeepSeek R1 gratuito - versione 0528',
+    free: true
+  },
+  {
+    name: 'DeepSeek R1 (Free)',
+    id: 'deepseek/deepseek-r1:free',
+    description: 'Modello DeepSeek R1 gratuito - ultima versione',
+    free: true
+  },
+  {
+    name: 'Gemini 2.0 Flash (Free)',
+    id: 'google/gemini-2.0-flash-exp:free',
+    description: 'Google Gemini 2.0 Flash sperimentale gratuito',
+    free: true
+  },
+  {
+    name: 'Qwen 2.5 7B (Free)',
+    id: 'qwen/qwen-2.5-7b-instruct:free',
+    description: 'Modello Qwen 2.5 7B gratuito',
+    free: true
+  },
+  {
+    name: 'Phi-3 Medium (Free)',
+    id: 'microsoft/phi-3-medium-128k-instruct:free',
+    description: 'Modello Phi-3 Medium gratuito',
+    free: true
+  }
 ];
 
-export const OPENAI_MODELS = [
-  'gpt-4',
-  'gpt-4-turbo',
-  'gpt-3.5-turbo',
-  'gpt-4o',
-  'gpt-4o-mini'
+export const OPENAI_MODELS: AIModel[] = [
+  {
+    name: 'GPT-4o',
+    id: 'gpt-4o',
+    description: 'GPT-4 ottimizzato, più veloce'
+  },
+  {
+    name: 'GPT-4o Mini',
+    id: 'gpt-4o-mini',
+    description: 'Versione più economica di GPT-4o'
+  },
+  {
+    name: 'GPT-4 Turbo',
+    id: 'gpt-4-turbo',
+    description: 'GPT-4 con contesto esteso'
+  },
+  {
+    name: 'GPT-3.5 Turbo',
+    id: 'gpt-3.5-turbo',
+    description: 'Modello veloce ed economico'
+  }
 ];
 
 class AIService {
   private settings: AISettings = {
-    provider: 'ollama',
-    ollamaUrl: 'http://localhost:11434',
-    openaiApiKey: '',
-    selectedModel: 'llama3',
-    enabled: false
+    provider: (import.meta.env.VITE_DEFAULT_AI_PROVIDER as AIProvider) || 'openrouter',
+    openrouterApiKey: import.meta.env.VITE_OPENROUTER_API_KEY || '',
+    openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
+    selectedModel: import.meta.env.VITE_DEFAULT_OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free',
+    enabled: import.meta.env.VITE_AI_ENABLED_DEFAULT === 'true' || false
   };
 
   constructor() {
@@ -63,8 +130,25 @@ class AIService {
   private loadSettings() {
     const saved = localStorage.getItem('ai-settings');
     if (saved) {
-      this.settings = { ...this.settings, ...JSON.parse(saved) };
+      const savedSettings = JSON.parse(saved);
+      // Mantieni le chiavi dalle variabili d'ambiente se quelle salvate sono vuote
+      this.settings = { 
+        ...this.settings, 
+        ...savedSettings,
+        // Priorità alle variabili d'ambiente per le chiavi API se non vuote
+        openrouterApiKey: savedSettings.openrouterApiKey || import.meta.env.VITE_OPENROUTER_API_KEY || '',
+        openaiApiKey: savedSettings.openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY || ''
+      };
     }
+    
+    // Debug: verifica che abbiamo le chiavi corrette
+    console.log('AI Settings loaded:', {
+      provider: this.settings.provider,
+      hasOpenRouterKey: !!this.settings.openrouterApiKey,
+      hasOpenAIKey: !!this.settings.openaiApiKey,
+      selectedModel: this.settings.selectedModel,
+      enabled: this.settings.enabled
+    });
   }
 
   private saveSettings() {
@@ -80,19 +164,83 @@ class AIService {
     return { ...this.settings };
   }
 
+  // Funzione utile per debug - forza refresh delle impostazioni dalle variabili d'ambiente
+  refreshFromEnvironment() {
+    this.settings.openrouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY || this.settings.openrouterApiKey;
+    this.settings.openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY || this.settings.openaiApiKey;
+    this.saveSettings();
+    console.log('Settings refreshed from environment');
+  }
+
+  // Funzione per debug delle chiavi (senza mostrare la chiave completa)
+  debugApiKeys() {
+    const openrouterKey = this.settings.openrouterApiKey;
+    const openaiKey = this.settings.openaiApiKey;
+    
+    console.log('API Keys Status:', {
+      openrouter: openrouterKey ? `${openrouterKey.substring(0, 8)}...${openrouterKey.substring(openrouterKey.length - 4)}` : 'MISSING',
+      openai: openaiKey ? `${openaiKey.substring(0, 8)}...${openaiKey.substring(openaiKey.length - 4)}` : 'MISSING',
+      provider: this.settings.provider,
+      model: this.settings.selectedModel
+    });
+  }
+
   async testConnection(): Promise<boolean> {
     try {
-      if (this.settings.provider === 'ollama') {
-        const response = await fetch(`${this.settings.ollamaUrl}/api/tags`);
-        return response.ok;
-      } else {
-        // Test OpenAI
-        const response = await fetch('https://api.openai.com/v1/models', {
+      if (this.settings.provider === 'openrouter') {
+        // Test con una chiamata reale all'endpoint chat/completions
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.settings.openrouterApiKey}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Thematic Analysis Tool'
+          },
+          body: JSON.stringify({
+            model: this.settings.selectedModel,
+            messages: [
+              {
+                role: 'user',
+                content: 'Test connection. Please respond with "OK".'
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 10
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return !!data.choices?.[0]?.message?.content;
+        }
+        return false;
+      } else {
+        // Test OpenAI con chiamata reale
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.settings.openaiApiKey}`,
           },
+          body: JSON.stringify({
+            model: this.settings.selectedModel,
+            messages: [
+              {
+                role: 'user',
+                content: 'Test connection. Please respond with "OK".'
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 10
+          }),
         });
-        return response.ok;
+        
+        if (response.ok) {
+          const data = await response.json();
+          return !!data.choices?.[0]?.message?.content;
+        }
+        return false;
       }
     } catch (error) {
       console.error('Errore connessione AI:', error);
@@ -100,22 +248,15 @@ class AIService {
     }
   }
 
-  async getAvailableModels(): Promise<OllamaModel[]> {
+  async getAvailableModels(): Promise<AIModel[]> {
     try {
-      if (this.settings.provider === 'ollama') {
-        const response = await fetch(`${this.settings.ollamaUrl}/api/tags`);
-        if (!response.ok) throw new Error('Errore nel recupero modelli Ollama');
-        
-        const data = await response.json();
-        return data.models || [];
+      if (this.settings.provider === 'openrouter') {
+        // Per OpenRouter, restituiamo i modelli gratuiti predefiniti
+        // In alternativa, possiamo fare una chiamata API per ottenere tutti i modelli
+        return OPENROUTER_FREE_MODELS;
       } else {
         // Per OpenAI, restituiamo la lista predefinita
-        return OPENAI_MODELS.map(name => ({
-          name,
-          size: 0,
-          digest: '',
-          modified_at: new Date().toISOString()
-        }));
+        return OPENAI_MODELS;
       }
     } catch (error) {
       console.error('Errore nel recupero modelli:', error);
@@ -129,8 +270,8 @@ class AIService {
     }
 
     try {
-      if (this.settings.provider === 'ollama') {
-        return await this.generateOllamaCompletion(prompt);
+      if (this.settings.provider === 'openrouter') {
+        return await this.generateOpenRouterCompletion(prompt);
       } else {
         return await this.generateOpenAICompletion(prompt);
       }
@@ -140,33 +281,51 @@ class AIService {
     }
   }
 
-  private async generateOllamaCompletion(prompt: string): Promise<string> {
-    const response = await fetch(`${this.settings.ollamaUrl}/api/generate`, {
+  private async generateOpenRouterCompletion(prompt: string): Promise<string> {
+    // Debug: verifica che abbiamo la chiave
+    if (!this.settings.openrouterApiKey) {
+      throw new Error('Chiave API OpenRouter mancante. Verifica la configurazione.');
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.settings.openrouterApiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Thematic Analysis Tool'
       },
       body: JSON.stringify({
         model: this.settings.selectedModel,
-        prompt: prompt,
-        stream: false,
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
-          max_tokens: 1000
-        }
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Errore Ollama API: ${response.status}`);
+      const errorText = await response.text();
+      if (response.status === 401) {
+        throw new Error(`Errore di autenticazione OpenRouter (401). Verifica che la chiave API sia corretta e valida. Dettagli: ${errorText}`);
+      }
+      throw new Error(`Errore OpenRouter API: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    return data.response || '';
+    return data.choices[0]?.message?.content || '';
   }
 
   private async generateOpenAICompletion(prompt: string): Promise<string> {
+    // Debug: verifica che abbiamo la chiave
+    if (!this.settings.openaiApiKey) {
+      throw new Error('Chiave API OpenAI mancante. Verifica la configurazione.');
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -187,7 +346,11 @@ class AIService {
     });
 
     if (!response.ok) {
-      throw new Error(`Errore OpenAI API: ${response.status}`);
+      const errorText = await response.text();
+      if (response.status === 401) {
+        throw new Error(`Errore di autenticazione OpenAI (401). Verifica che la chiave API sia corretta e valida. Dettagli: ${errorText}`);
+      }
+      throw new Error(`Errore OpenAI API: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -281,3 +444,9 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
 }
 
 export const aiService = new AIService();
+
+// Esponiamo il servizio per debug dalla console del browser
+if (typeof window !== 'undefined') {
+  (window as any).aiService = aiService;
+  console.log('AI Service is available at window.aiService for debugging');
+}

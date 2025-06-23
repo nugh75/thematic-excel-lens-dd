@@ -7,12 +7,12 @@ import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { Loader2, CheckCircle, XCircle, Bot, Server, Cloud } from 'lucide-react';
-import { aiService, type AISettings, type OllamaModel, OLLAMA_MODELS, OPENAI_MODELS } from '../services/aiService';
+import { aiService, type AISettings, type AIModel, OPENROUTER_FREE_MODELS, OPENAI_MODELS } from '../services/aiService';
 import { useToast } from '../hooks/use-toast';
 
 export function AISettingsPanel() {
   const [settings, setSettings] = useState<AISettings>(aiService.getSettings());
-  const [models, setModels] = useState<OllamaModel[]>([]);
+  const [models, setModels] = useState<AIModel[]>([]);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -29,7 +29,7 @@ export function AISettingsPanel() {
     
     // Se cambiamo provider, resettiamo il modello
     if (key === 'provider') {
-      newSettings.selectedModel = value === 'ollama' ? 'llama3' : 'gpt-3.5-turbo';
+      newSettings.selectedModel = value === 'openrouter' ? 'meta-llama/llama-3.1-8b-instruct:free' : 'gpt-3.5-turbo';
       setConnectionStatus('unknown');
       setModels([]);
     }
@@ -68,8 +68,6 @@ export function AISettingsPanel() {
   };
 
   const loadModels = async () => {
-    if (settings.provider === 'openai') return; // Non necessario per OpenAI
-    
     setIsLoadingModels(true);
     try {
       const availableModels = await aiService.getAvailableModels();
@@ -77,7 +75,7 @@ export function AISettingsPanel() {
       
       // Se non c'è un modello selezionato e ci sono modelli disponibili, seleziona il primo
       if (!settings.selectedModel && availableModels.length > 0) {
-        handleSettingsChange('selectedModel', availableModels[0].name);
+        handleSettingsChange('selectedModel', availableModels[0].id);
       }
     } catch (error) {
       toast({
@@ -109,7 +107,7 @@ export function AISettingsPanel() {
           Configurazione AI
         </CardTitle>
         <CardDescription>
-          Configura l'integrazione con Ollama (locale) o OpenAI (cloud) per assistenza AI
+          Configura l'integrazione con OpenRouter (modelli gratuiti) o OpenAI (cloud premium)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -130,48 +128,49 @@ export function AISettingsPanel() {
               <Label htmlFor="provider-select">Provider AI</Label>
               <Select
                 value={settings.provider}
-                onValueChange={(value: 'ollama' | 'openai') => handleSettingsChange('provider', value)}
+                onValueChange={(value: 'openrouter' | 'openai') => handleSettingsChange('provider', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ollama">
+                  <SelectItem value="openrouter">
                     <div className="flex items-center gap-2">
                       <Server className="h-4 w-4" />
-                      Ollama (Locale)
+                      OpenRouter (Modelli Gratuiti)
                     </div>
                   </SelectItem>
                   <SelectItem value="openai">
                     <div className="flex items-center gap-2">
                       <Cloud className="h-4 w-4" />
-                      OpenAI (Cloud)
+                      OpenAI (Premium)
                     </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {settings.provider === 'ollama' 
-                  ? 'Ollama esegue modelli AI localmente sul tuo computer'
-                  : 'OpenAI utilizza modelli cloud avanzati (richiede API key e crediti)'
+                {settings.provider === 'openrouter' 
+                  ? 'OpenRouter offre accesso a modelli AI gratuiti inclusi Llama, Mistral e altri'
+                  : 'OpenAI offre modelli premium GPT-4 e GPT-3.5 (richiede API key e crediti)'
                 }
               </p>
             </div>
 
-            {/* Configurazione Ollama */}
-            {settings.provider === 'ollama' && (
+            {/* Configurazione OpenRouter */}
+            {settings.provider === 'openrouter' && (
               <div className="space-y-2">
-                <Label htmlFor="ollama-url">URL Ollama</Label>
+                <Label htmlFor="openrouter-key">API Key OpenRouter</Label>
                 <div className="flex space-x-2">
                   <Input
-                    id="ollama-url"
-                    value={settings.ollamaUrl}
-                    onChange={(e) => handleSettingsChange('ollamaUrl', e.target.value)}
-                    placeholder="http://localhost:11434"
+                    id="openrouter-key"
+                    type="password"
+                    value={settings.openrouterApiKey}
+                    onChange={(e) => handleSettingsChange('openrouterApiKey', e.target.value)}
+                    placeholder="sk-or-..."
                   />
                   <Button
                     onClick={testConnection}
-                    disabled={isTestingConnection}
+                    disabled={isTestingConnection || !settings.openrouterApiKey}
                     variant="outline"
                     size="sm"
                   >
@@ -184,7 +183,11 @@ export function AISettingsPanel() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Assicurati che Ollama sia avviato. Default: http://localhost:11434
+                  Crea un account gratuito su{' '}
+                  <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="underline">
+                    openrouter.ai
+                  </a>{' '}
+                  per ottenere la tua API key gratuita
                 </p>
               </div>
             )}
@@ -249,67 +252,69 @@ export function AISettingsPanel() {
                     <SelectValue placeholder="Seleziona un modello" />
                   </SelectTrigger>
                   <SelectContent>
-                    {settings.provider === 'ollama' ? (
-                      // Mostra prima i modelli disponibili, poi quelli predefiniti
-                      <>
-                        {models.length > 0 ? models.map((model) => (
-                          <SelectItem key={model.name} value={model.name}>
-                            {model.name}
-                          </SelectItem>
-                        )) : OLLAMA_MODELS.map((model) => (
-                          <SelectItem key={model} value={model}>
-                            {model}
-                          </SelectItem>
-                        ))}
-                      </>
+                    {settings.provider === 'openrouter' ? (
+                      // Modelli OpenRouter gratuiti
+                      OPENROUTER_FREE_MODELS.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex flex-col">
+                            <span>{model.name}</span>
+                            {model.description && (
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
                     ) : (
-                      // Modelli OpenAI predefiniti
+                      // Modelli OpenAI
                       OPENAI_MODELS.map((model) => (
-                        <SelectItem key={model} value={model}>
-                          {model}
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex flex-col">
+                            <span>{model.name}</span>
+                            {model.description && (
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
+                            )}
+                          </div>
                         </SelectItem>
                       ))
                     )}
                   </SelectContent>
                 </Select>
-                {settings.provider === 'ollama' && (
-                  <Button
-                    onClick={loadModels}
-                    disabled={isLoadingModels || connectionStatus !== 'connected'}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {isLoadingModels ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      'Aggiorna'
-                    )}
-                  </Button>
-                )}
+                <Button
+                  onClick={loadModels}
+                  disabled={isLoadingModels}
+                  variant="outline"
+                  size="sm"
+                >
+                  {isLoadingModels ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Aggiorna'
+                  )}
+                </Button>
               </div>
-              {settings.provider === 'ollama' && models.length === 0 && !isLoadingModels && connectionStatus === 'connected' && (
-                <p className="text-sm text-muted-foreground">
-                  Nessun modello trovato. Scarica modelli con: <code>ollama pull llama3</code>
-                </p>
-              )}
             </div>
 
             {/* Informazioni sui modelli */}
-            {settings.provider === 'ollama' && models.length > 0 && (
+            {settings.provider === 'openrouter' && (
               <div className="space-y-2">
-                <Label>Modelli Ollama disponibili ({models.length})</Label>
+                <Label>Modelli OpenRouter Gratuiti ({OPENROUTER_FREE_MODELS.length})</Label>
                 <div className="text-sm text-muted-foreground">
-                  {models.slice(0, 3).map(model => model.name).join(', ')}
-                  {models.length > 3 && ` e altri ${models.length - 3} modelli`}
+                  Llama 3.1 8B, Mistral 7B, Qwen 2.5 7B, Phi-3 Medium e altri modelli gratuiti
+                </div>
+                <div className="text-xs text-green-600 font-medium">
+                  ✓ Tutti i modelli sono completamente gratuiti
                 </div>
               </div>
             )}
 
             {settings.provider === 'openai' && (
               <div className="space-y-2">
-                <Label>Modelli OpenAI disponibili</Label>
+                <Label>Modelli OpenAI Premium ({OPENAI_MODELS.length})</Label>
                 <div className="text-sm text-muted-foreground">
-                  GPT-4, GPT-3.5 Turbo e altri modelli avanzati
+                  GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo - modelli avanzati a pagamento
+                </div>
+                <div className="text-xs text-orange-600 font-medium">
+                  ⚠️ Richiede crediti OpenAI per l'utilizzo
                 </div>
               </div>
             )}

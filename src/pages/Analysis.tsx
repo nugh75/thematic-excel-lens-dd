@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExcelUploader from '../components/ExcelUploader';
-import LabelManagerAdvanced from '../components/LabelManagerAdvanced';
+import LabelManager from '../components/LabelManager';
 import ProjectSettings from '../components/ProjectSettings';
 import { AISettingsPanel } from '../components/AISettingsPanel';
 import { AIConsultant } from '../components/AIConsultant';
@@ -128,7 +128,7 @@ const Analysis = () => {
             </TabsContent>
             
             <TabsContent value="labels" className="space-y-6">
-              <LabelManagerAdvanced />
+              <LabelManager />
             </TabsContent>
             
             <TabsContent value="ai-consultant" className="space-y-6">
