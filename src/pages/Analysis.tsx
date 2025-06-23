@@ -4,6 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExcelUploader from '../components/ExcelUploader';
 import LabelManagerAdvanced from '../components/LabelManagerAdvanced';
 import ProjectSettings from '../components/ProjectSettings';
+import { AISettingsPanel } from '../components/AISettingsPanel';
+import { AIConsultant } from '../components/AIConsultant';
+import { AIFloatingButton } from '../components/AIFloatingButton';
 import DataGrid from '../components/DataGrid';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import UserManager from '../components/UserManager';
@@ -20,8 +23,12 @@ import ColumnConfigurator from '../components/ColumnConfigurator';
 import { useAnalysisStore } from '../store/analysisStore';
 
 const Analysis = () => {
-  const excelData = useAnalysisStore((state) => state.excelData);
-  const currentUser = useAnalysisStore((state) => state.currentUser);
+  const { 
+    excelData, 
+    currentUser, 
+    currentProject, 
+    labels
+  } = useAnalysisStore();
   const [dataView, setDataView] = useState<'grid' | 'column' | 'row'>('grid');
 
   // Show login screen if no user is logged in
@@ -80,13 +87,14 @@ const Analysis = () => {
           </div>
         ) : (
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-11">
+            <TabsList className="grid w-full grid-cols-12">
               <TabsTrigger value="projects">Progetti</TabsTrigger>
               <TabsTrigger value="settings">Impostazioni</TabsTrigger>
+              <TabsTrigger value="ai-settings">AI Config</TabsTrigger>
               <TabsTrigger value="config">Config</TabsTrigger>
               <TabsTrigger value="data">Dati</TabsTrigger>
               <TabsTrigger value="labels">Etichette</TabsTrigger>
-              <TabsTrigger value="suggestions">AI</TabsTrigger>
+              <TabsTrigger value="ai-consultant">AI Consulente</TabsTrigger>
               <TabsTrigger value="users">Utenti</TabsTrigger>
               <TabsTrigger value="sessions">Sessioni</TabsTrigger>
               <TabsTrigger value="conflicts">Conflitti</TabsTrigger>
@@ -101,6 +109,10 @@ const Analysis = () => {
             
             <TabsContent value="settings" className="space-y-6">
               <ProjectSettings />
+            </TabsContent>
+            
+            <TabsContent value="ai-settings" className="space-y-6">
+              <AISettingsPanel />
             </TabsContent>
             
             <TabsContent value="config" className="space-y-6">
@@ -119,8 +131,14 @@ const Analysis = () => {
               <LabelManagerAdvanced />
             </TabsContent>
             
-            <TabsContent value="suggestions" className="space-y-6">
-              <SuggestionPanel />
+            <TabsContent value="ai-consultant" className="space-y-6">
+              <AIConsultant 
+                context={`Analisi tematica del progetto "${currentProject?.name || 'Senza nome'}". 
+                         Dataset con ${excelData?.rows?.length || 0} righe e ${excelData?.headers?.length || 0} colonne.
+                         Etichette attive: ${labels.length}.`}
+                title="Consulente AI per Analisi Tematica"
+                description="Ottieni consigli personalizzati per migliorare la tua analisi qualitativa"
+              />
             </TabsContent>
             
             <TabsContent value="users" className="space-y-6">
@@ -144,6 +162,13 @@ const Analysis = () => {
             </TabsContent>
           </Tabs>
         )}
+
+        {/* Bottone AI flottante */}
+        <AIFloatingButton 
+          context={`Analisi tematica del progetto "${currentProject?.name || 'Senza nome'}". 
+                   Dataset con ${excelData?.rows?.length || 0} righe e ${excelData?.headers?.length || 0} colonne.
+                   Etichette attive: ${labels.length}.`}
+        />
       </div>
     </div>
   );

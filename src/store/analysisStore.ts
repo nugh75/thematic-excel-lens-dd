@@ -686,6 +686,12 @@ export const useAnalysisStore = create<AnalysisStore>()(
     }),
     {
       name: 'thematic-analysis-storage',
+      partialize: (state) => ({
+        ...state,
+        // Assicuriamoci che i dati critici vengano sempre salvati
+        currentUser: state.currentUser || defaultUser,
+        users: state.users.length > 0 ? state.users : [defaultUser],
+      }),
     }
   )
 );

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronUp, ChevronDown, Columns, Tag, Plus } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
+import { AISuggestions } from './AISuggestions';
 
 const colors = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -227,6 +228,12 @@ const SingleColumnView = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Suggerimenti AI per la colonna */}
+      <AISuggestions 
+        columnName={excelData.headers[selectedColumn]}
+        responses={columnData.map(item => item.value)}
+      />
 
       {/* Dialog per etichettatura */}
       <Dialog open={isLabelingOpen} onOpenChange={setIsLabelingOpen}>

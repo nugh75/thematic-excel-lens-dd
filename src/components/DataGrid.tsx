@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { ColumnType } from '../types/analysis';
 import CellNavigator from './CellNavigator';
 import ColumnSelector from './ColumnSelector';
+import { AIQuickAccess } from './AIQuickAccess';
 
 const colors = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -335,14 +336,27 @@ const colors = [
                         <div className="font-medium">
                           {excelData.headers[colIndex] || `Colonna ${colIndex + 1}`}
                         </div>
-                        {currentProject && (
-                          <Badge 
-                            className={`text-xs gap-1 ${getColumnTypeColor(getColumnType(colIndex))}`}
-                          >
-                            {getColumnTypeIcon(getColumnType(colIndex))}
-                            {getColumnType(colIndex)}
-                          </Badge>
-                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          {currentProject && (
+                            <Badge 
+                              className={`text-xs gap-1 ${getColumnTypeColor(getColumnType(colIndex))}`}
+                            >
+                              {getColumnTypeIcon(getColumnType(colIndex))}
+                              {getColumnType(colIndex)}
+                            </Badge>
+                          )}
+                          {getColumnType(colIndex) === 'open' && (
+                            <AIQuickAccess
+                              columnName={excelData.headers[colIndex]}
+                              responses={excelData.rows.map(row => row[colIndex] || '').filter(v => v && typeof v === 'string' && v.trim())}
+                              trigger={
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <span className="text-xs">🤖</span>
+                                </Button>
+                              }
+                            />
+                          )}
+                        </div>
                       </div>
                     </TableHead>
                   ))}
