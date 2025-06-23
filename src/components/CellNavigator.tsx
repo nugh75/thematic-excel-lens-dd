@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -132,6 +131,34 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
     } else {
       setSelectedLabels(selectedLabels.filter(id => id !== labelId));
     }
+  };
+
+  const handleCreateLabel = () => {
+    if (!newLabelName.trim()) {
+      toast({
+        title: "Errore",
+        description: "Il nome dell'etichetta è obbligatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addLabel({
+      name: newLabelName.trim(),
+      description: newLabelDescription.trim(),
+      color: newLabelColor,
+    });
+    
+    toast({
+      title: "Etichetta creata",
+      description: `Etichetta "${newLabelName}" creata con successo`,
+    });
+
+    // Reset form
+    setNewLabelName('');
+    setNewLabelDescription('');
+    setNewLabelColor(colors[0]);
+    setIsCreatingLabel(false);
   };
 
   const isCellSelected = (rowIndex: number, colIndex: number) => {
@@ -304,12 +331,84 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
           {/* Selezione etichette */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Tags className="h-5 w-5" />
-                3. Seleziona Etichette
+              <CardTitle className="text-lg flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Tags className="h-5 w-5" />
+                  3. Seleziona Etichette
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreatingLabel(!isCreatingLabel)}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuova
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {isCreatingLabel && (
+                <div className="p-3 border rounded-lg bg-muted/20 space-y-3 mb-4">
+                  <div>
+                    <Label htmlFor="new-label-name">Nome *</Label>
+                    <Input
+                      id="new-label-name"
+                      value={newLabelName}
+                      onChange={(e) => setNewLabelName(e.target.value)}
+                      placeholder="Nome dell'etichetta"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="new-label-description">Descrizione</Label>
+                    <Textarea
+                      id="new-label-description"
+                      value={newLabelDescription}
+                      onChange={(e) => setNewLabelDescription(e.target.value)}
+                      placeholder="Descrizione opzionale"
+                      className="mt-1"
+                      rows={2}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Colore</Label>
+                    <div className="flex gap-2 mt-2">
+                      {colors.map(color => (
+                        <button
+                          key={color}
+                          className={`w-6 h-6 rounded-full border-2 ${
+                            newLabelColor === color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setNewLabelColor(color)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreateLabel}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Crea
+                    </Button>
+                    <Button
+                      onClick={() => setIsCreatingLabel(false)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Annulla
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {labels.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Nessuna etichetta disponibile. Crea prima delle etichette.
@@ -363,6 +462,72 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
                   </div>
                 </div>
               )}
+
+              {/* Creazione nuova etichetta */}
+              <div className="mt-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => setIsCreatingLabel(!isCreatingLabel)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {isCreatingLabel ? 'Annulla' : 'Crea Nuova Etichetta'}
+                </Button>
+
+                {isCreatingLabel && (
+                  <div className="mt-3 p-4 border rounded-lg bg-muted">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Inserisci i dettagli per la nuova etichetta.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Nome etichetta</Label>
+                        <Input 
+                          placeholder="Inserisci il nome dell'etichetta"
+                          value={newLabelName}
+                          onChange={(e) => setNewLabelName(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Colore etichetta</Label>
+                        <Select value={newLabelColor} onValueChange={setNewLabelColor}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona un colore" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {colors.map(color => (
+                              <SelectItem key={color} value={color}>
+                                <div className="flex items-center">
+                                  <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: color }} />
+                                  {color}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      <Label>Descrizione etichetta (opzionale)</Label>
+                      <Textarea 
+                        placeholder="Inserisci una descrizione per l'etichetta"
+                        value={newLabelDescription}
+                        onChange={(e) => setNewLabelDescription(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handleCreateLabel} 
+                      className="mt-4 w-full"
+                    >
+                      Crea Etichetta
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 

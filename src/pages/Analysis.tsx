@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExcelUploader from '../components/ExcelUploader';
-import LabelManager from '../components/LabelManager';
+import LabelManagerAdvanced from '../components/LabelManagerAdvanced';
+import ProjectSettings from '../components/ProjectSettings';
 import DataGrid from '../components/DataGrid';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import UserManager from '../components/UserManager';
@@ -81,6 +82,7 @@ const Analysis = () => {
           <Tabs defaultValue="data" className="w-full">
             <TabsList className="grid w-full grid-cols-11">
               <TabsTrigger value="projects">Progetti</TabsTrigger>
+              <TabsTrigger value="settings">Impostazioni</TabsTrigger>
               <TabsTrigger value="config">Config</TabsTrigger>
               <TabsTrigger value="data">Dati</TabsTrigger>
               <TabsTrigger value="labels">Etichette</TabsTrigger>
@@ -90,11 +92,15 @@ const Analysis = () => {
               <TabsTrigger value="conflicts">Conflitti</TabsTrigger>
               <TabsTrigger value="analysis">Analisi</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
-              <TabsTrigger value="upload">Carica Nuovo</TabsTrigger>
             </TabsList>
             
             <TabsContent value="projects" className="space-y-6">
               <ProjectManager />
+              <ExcelUploader />
+            </TabsContent>
+            
+            <TabsContent value="settings" className="space-y-6">
+              <ProjectSettings />
             </TabsContent>
             
             <TabsContent value="config" className="space-y-6">
@@ -110,7 +116,7 @@ const Analysis = () => {
             </TabsContent>
             
             <TabsContent value="labels" className="space-y-6">
-              <LabelManager />
+              <LabelManagerAdvanced />
             </TabsContent>
             
             <TabsContent value="suggestions" className="space-y-6">
@@ -135,10 +141,6 @@ const Analysis = () => {
             
             <TabsContent value="export" className="space-y-6">
               <ExportManager />
-            </TabsContent>
-            
-            <TabsContent value="upload" className="space-y-6">
-              <ExcelUploader />
             </TabsContent>
           </Tabs>
         )}

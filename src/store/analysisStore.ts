@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ThematicAnalysis, Label, CellLabel, RowLabel, ExcelData, User, LabelingSession, ConflictResolution, Project, ColumnMetadata, ColumnType } from '../types/analysis';
@@ -8,6 +7,7 @@ interface AnalysisStore extends ThematicAnalysis {
   addLabel: (label: Omit<Label, 'id'>) => void;
   updateLabel: (id: string, updates: Partial<Label>) => void;
   deleteLabel: (id: string) => void;
+  mergeLabels: (sourceLabels: string[], targetLabel: string) => void;
   addCellLabel: (cellLabel: CellLabel) => void;
   removeCellLabel: (cellId: string, labelId: string) => void;
   addRowLabel: (rowLabel: RowLabel) => void;
@@ -32,6 +32,7 @@ interface AnalysisStore extends ThematicAnalysis {
   loadProject: (projectId: string) => void;
   saveCurrentProject: () => void;
   deleteProject: (projectId: string) => void;
+  updateProject: (projectId: string, updates: Partial<Pick<Project, 'name' | 'description'>>) => void;
   addCollaborator: (projectId: string, userId: string) => void;
   removeCollaborator: (projectId: string, userId: string) => void;
   switchProject: (projectId: string) => void;
@@ -189,6 +190,40 @@ export const useAnalysisStore = create<AnalysisStore>()(
             labelIds: rowLabel.labelIds.filter((labelId) => labelId !== id),
           })),
         }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
+      },
+
+      mergeLabels: (sourceLabels, targetLabel) => {
+        set((state) => {
+          // Verifica che l'etichetta target esista
+          const targetExists = state.labels.some(label => label.id === targetLabel);
+          if (!targetExists) return state;
+
+          // Aggiorna tutti i riferimenti dalle etichette sorgente all'etichetta target
+          const updatedCellLabels = state.cellLabels.map(cellLabel => ({
+            ...cellLabel,
+            labelIds: cellLabel.labelIds.map(labelId => 
+              sourceLabels.includes(labelId) ? targetLabel : labelId
+            ).filter((labelId, index, arr) => arr.indexOf(labelId) === index) // Rimuovi duplicati
+          }));
+
+          const updatedRowLabels = state.rowLabels.map(rowLabel => ({
+            ...rowLabel,
+            labelIds: rowLabel.labelIds.map(labelId => 
+              sourceLabels.includes(labelId) ? targetLabel : labelId
+            ).filter((labelId, index, arr) => arr.indexOf(labelId) === index) // Rimuovi duplicati
+          }));
+
+          // Rimuovi le etichette sorgente
+          const updatedLabels = state.labels.filter(label => !sourceLabels.includes(label.id));
+
+          return {
+            labels: updatedLabels,
+            cellLabels: updatedCellLabels,
+            rowLabels: updatedRowLabels,
+          };
+        });
         // Auto-save al progetto corrente
         setTimeout(() => get().saveCurrentProject(), 100);
       },
@@ -379,6 +414,23 @@ export const useAnalysisStore = create<AnalysisStore>()(
           currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
           excelData: state.currentProject?.id === projectId ? null : state.excelData,
         }));
+      },
+
+      updateProject: (projectId, updates) => {
+        set((state) => {
+          const updatedProjects = state.projects.map(p => 
+            p.id === projectId ? { ...p, ...updates } : p
+          );
+          
+          const updatedCurrentProject = state.currentProject?.id === projectId 
+            ? { ...state.currentProject, ...updates }
+            : state.currentProject;
+
+          return {
+            projects: updatedProjects,
+            currentProject: updatedCurrentProject,
+          };
+        });
       },
 
       addCollaborator: (projectId, userId) => {
