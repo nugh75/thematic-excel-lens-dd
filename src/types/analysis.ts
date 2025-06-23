@@ -1,8 +1,26 @@
-
 export interface ExcelData {
   headers: string[];
   rows: string[][];
   fileName: string;
+}
+
+export type ColumnType = 'demographic' | 'closed' | 'open';
+
+export interface ColumnMetadata {
+  index: number;
+  name: string;
+  type: ColumnType;
+  description?: string;
+  isRequired?: boolean;
+  autoDetected?: boolean;
+  sampleValues?: string[];
+}
+
+export interface ProjectConfig {
+  columnMetadata: ColumnMetadata[];
+  isConfigured: boolean;
+  configuredAt?: number;
+  configuredBy?: string;
 }
 
 export interface Label {
@@ -60,6 +78,8 @@ export interface ThematicAnalysis {
   currentUser: User | null;
   sessions: LabelingSession[];
   currentSession: LabelingSession | null;
+  projects: Project[];
+  currentProject: Project | null;
 }
 
 export interface AnalysisStats {
@@ -78,4 +98,20 @@ export interface ConflictResolution {
   resolvedLabelIds: string[];
   resolvedBy: string;
   resolvedAt: number;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  excelData: ExcelData;
+  config: ProjectConfig;
+  createdAt: number;
+  createdBy: string;
+  lastModified: number;
+  isActive: boolean;
+  collaborators: string[]; // User IDs
+  labels: Label[];
+  cellLabels: CellLabel[];
+  rowLabels: RowLabel[];
 }

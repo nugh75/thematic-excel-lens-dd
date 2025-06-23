@@ -5,12 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, Search, Tags, Grid } from 'lucide-react';
+import { Navigation, Search, Tags, Grid, Plus } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
+
+const colors = [
+  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
+];
 
 interface CellNavigatorProps {
   onNavigateToCell: (rowIndex: number, colIndex: number) => void;
@@ -18,13 +24,19 @@ interface CellNavigatorProps {
 }
 
 const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) => {
-  const { excelData, labels } = useAnalysisStore();
+  const { excelData, labels, addLabel } = useAnalysisStore();
   const [isOpen, setIsOpen] = useState(false);
   const [keyColumn, setKeyColumn] = useState<number | null>(null);
   const [searchKey, setSearchKey] = useState('');
   const [selectedCells, setSelectedCells] = useState<{row: number, col: number}[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [foundRows, setFoundRows] = useState<number[]>([]);
+  
+  // Stati per creazione etichette inline
+  const [isCreatingLabel, setIsCreatingLabel] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelDescription, setNewLabelDescription] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
 
   if (!excelData) return null;
 

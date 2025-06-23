@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ThematicAnalysis, Label, CellLabel, RowLabel, ExcelData, User, LabelingSession, ConflictResolution } from '../types/analysis';
+import { ThematicAnalysis, Label, CellLabel, RowLabel, ExcelData, User, LabelingSession, ConflictResolution, Project, ColumnMetadata, ColumnType } from '../types/analysis';
 
 interface AnalysisStore extends ThematicAnalysis {
   setExcelData: (data: ExcelData) => void;
@@ -27,6 +27,22 @@ interface AnalysisStore extends ThematicAnalysis {
   saveCurrentSession: () => void;
   deleteSession: (sessionId: string) => void;
   
+  // Project management
+  createProject: (name: string, description: string, excelData: ExcelData) => void;
+  loadProject: (projectId: string) => void;
+  saveCurrentProject: () => void;
+  deleteProject: (projectId: string) => void;
+  addCollaborator: (projectId: string, userId: string) => void;
+  removeCollaborator: (projectId: string, userId: string) => void;
+  switchProject: (projectId: string) => void;
+  
+  // Column configuration
+  configureColumns: (columnMetadata: ColumnMetadata[]) => void;
+  updateColumnType: (columnIndex: number, type: ColumnType) => void;
+  getOpenQuestionColumns: () => ColumnMetadata[];
+  getClosedQuestionColumns: () => ColumnMetadata[];
+  getDemographicColumns: () => ColumnMetadata[];
+  
   // Conflict resolution
   getConflicts: () => ConflictResolution[];
   resolveConflict: (conflict: ConflictResolution) => void;
@@ -42,6 +58,43 @@ const defaultUser: User = {
   createdAt: Date.now(),
 };
 
+// Auto-detect column type based on header name and sample values
+const autoDetectColumnType = (headerName: string, sampleValues: string[]): ColumnType => {
+  const header = headerName.toLowerCase();
+  
+  // Demographic indicators
+  const demographicKeywords = [
+    'età', 'age', 'sesso', 'sex', 'genere', 'gender', 'città', 'city', 'provincia', 'region',
+    'titolo', 'education', 'istruzione', 'lavoro', 'job', 'professione', 'profession',
+    'nome', 'name', 'cognome', 'surname', 'email', 'telefono', 'phone', 'indirizzo', 'address',
+    'codice', 'id', 'anagrafica', 'demographic'
+  ];
+  
+  // Check if header matches demographic keywords
+  if (demographicKeywords.some(keyword => header.includes(keyword))) {
+    return 'demographic';
+  }
+  
+  // Analyze sample values to determine if closed or open
+  if (sampleValues.length > 0) {
+    const uniqueValues = [...new Set(sampleValues)];
+    const avgLength = sampleValues.reduce((sum, val) => sum + val.length, 0) / sampleValues.length;
+    
+    // If few unique values and short text, likely closed question
+    if (uniqueValues.length <= 10 && avgLength <= 50) {
+      return 'closed';
+    }
+    
+    // If many unique values or long text, likely open question
+    if (uniqueValues.length > 10 || avgLength > 50) {
+      return 'open';
+    }
+  }
+  
+  // Default to open for unknown cases
+  return 'open';
+};
+
 export const useAnalysisStore = create<AnalysisStore>()(
   persist(
     (set, get) => ({
@@ -53,13 +106,65 @@ export const useAnalysisStore = create<AnalysisStore>()(
       currentUser: defaultUser,
       sessions: [],
       currentSession: null,
+      projects: [],
+      currentProject: null,
 
-      setExcelData: (data) => set({ excelData: data }),
+      setExcelData: (data) => {
+        const { currentUser, saveCurrentProject } = get();
+        
+        // Salva il progetto corrente se esiste
+        saveCurrentProject();
+        
+        // Auto-detect column types
+        const columnMetadata: ColumnMetadata[] = data.headers.map((header, index) => {
+          const sampleValues = data.rows.slice(0, 10).map(row => row[index]).filter(Boolean);
+          const detectedType = autoDetectColumnType(header, sampleValues);
+          
+          return {
+            index,
+            name: header,
+            type: detectedType,
+            autoDetected: true,
+            sampleValues: sampleValues.slice(0, 5),
+          };
+        });
+        
+        // Crea un nuovo progetto per il file caricato
+        const newProject: Project = {
+          id: Date.now().toString(),
+          name: data.fileName,
+          description: `Progetto creato da ${data.fileName}`,
+          excelData: data,
+          config: {
+            columnMetadata,
+            isConfigured: false,
+          },
+          createdAt: Date.now(),
+          createdBy: currentUser?.id || 'unknown',
+          lastModified: Date.now(),
+          isActive: true,
+          collaborators: [currentUser?.id || 'unknown'],
+          labels: [],
+          cellLabels: [],
+          rowLabels: [],
+        };
+
+        set((state) => ({
+          projects: [...state.projects, newProject],
+          currentProject: newProject,
+          excelData: data,
+          labels: [],
+          cellLabels: [],
+          rowLabels: [],
+        }));
+      },
 
       addLabel: (labelData) => {
         const id = Date.now().toString();
         const newLabel: Label = { ...labelData, id };
         set((state) => ({ labels: [...state.labels, newLabel] }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       updateLabel: (id, updates) => {
@@ -68,6 +173,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             label.id === id ? { ...label, ...updates } : label
           ),
         }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       deleteLabel: (id) => {
@@ -82,6 +189,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             labelIds: rowLabel.labelIds.filter((labelId) => labelId !== id),
           })),
         }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       addCellLabel: (cellLabel) => {
@@ -109,6 +218,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             return { cellLabels: [...state.cellLabels, labelWithUser] };
           }
         });
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       removeCellLabel: (cellId, labelId) => {
@@ -123,6 +234,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
               : cellLabel
           ).filter((cellLabel) => cellLabel.labelIds.length > 0),
         }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       addRowLabel: (rowLabel) => {
@@ -150,6 +263,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             return { rowLabels: [...state.rowLabels, labelWithUser] };
           }
         });
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       removeRowLabel: (rowIndex, labelId) => {
@@ -164,6 +279,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
               : rowLabel
           ).filter((rowLabel) => rowLabel.labelIds.length > 0),
         }));
+        // Auto-save al progetto corrente
+        setTimeout(() => get().saveCurrentProject(), 100);
       },
 
       clearAnalysis: () => set({ 
@@ -174,6 +291,189 @@ export const useAnalysisStore = create<AnalysisStore>()(
         sessions: [],
         currentSession: null,
       }),
+
+      // Project management
+      createProject: (name, description, excelData) => {
+        const { currentUser } = get();
+        
+        // Auto-detect column types
+        const columnMetadata: ColumnMetadata[] = excelData.headers.map((header, index) => {
+          const sampleValues = excelData.rows.slice(0, 10).map(row => row[index]).filter(Boolean);
+          const detectedType = autoDetectColumnType(header, sampleValues);
+          
+          return {
+            index,
+            name: header,
+            type: detectedType,
+            autoDetected: true,
+            sampleValues: sampleValues.slice(0, 5),
+          };
+        });
+
+        const newProject: Project = {
+          id: Date.now().toString(),
+          name,
+          description,
+          excelData,
+          config: {
+            columnMetadata,
+            isConfigured: false,
+          },
+          createdAt: Date.now(),
+          createdBy: currentUser?.id || 'unknown',
+          lastModified: Date.now(),
+          isActive: true,
+          collaborators: [currentUser?.id || 'unknown'],
+          labels: [],
+          cellLabels: [],
+          rowLabels: [],
+        };
+
+        set((state) => ({
+          projects: [...state.projects, newProject],
+          currentProject: newProject,
+          excelData,
+          labels: [],
+          cellLabels: [],
+          rowLabels: [],
+        }));
+      },
+
+      loadProject: (projectId) => {
+        const { projects } = get();
+        const project = projects.find(p => p.id === projectId);
+        if (project) {
+          set({
+            currentProject: project,
+            excelData: project.excelData,
+            labels: [...project.labels],
+            cellLabels: [...project.cellLabels],
+            rowLabels: [...project.rowLabels],
+          });
+        }
+      },
+
+      saveCurrentProject: () => {
+        const { currentProject, labels, cellLabels, rowLabels } = get();
+        if (currentProject) {
+          const updatedProject = {
+            ...currentProject,
+            labels: [...labels],
+            cellLabels: [...cellLabels],
+            rowLabels: [...rowLabels],
+            lastModified: Date.now(),
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      deleteProject: (projectId) => {
+        set((state) => ({
+          projects: state.projects.filter(p => p.id !== projectId),
+          currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
+          excelData: state.currentProject?.id === projectId ? null : state.excelData,
+        }));
+      },
+
+      addCollaborator: (projectId, userId) => {
+        set((state) => ({
+          projects: state.projects.map(p => 
+            p.id === projectId 
+              ? { ...p, collaborators: [...new Set([...p.collaborators, userId])] }
+              : p
+          ),
+        }));
+      },
+
+      removeCollaborator: (projectId, userId) => {
+        set((state) => ({
+          projects: state.projects.map(p => 
+            p.id === projectId 
+              ? { ...p, collaborators: p.collaborators.filter(id => id !== userId) }
+              : p
+          ),
+        }));
+      },
+
+      switchProject: (projectId) => {
+        const { loadProject, saveCurrentProject } = get();
+        saveCurrentProject(); // Salva il progetto corrente prima di cambiare
+        loadProject(projectId);
+      },
+
+      // Column configuration
+      configureColumns: (columnMetadata) => {
+        const { currentProject } = get();
+        if (currentProject) {
+          const updatedProject = {
+            ...currentProject,
+            config: {
+              ...currentProject.config,
+              columnMetadata,
+              isConfigured: true,
+              configuredAt: Date.now(),
+              configuredBy: get().currentUser?.id,
+            },
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      updateColumnType: (columnIndex, type) => {
+        const { currentProject } = get();
+        if (currentProject) {
+          const updatedMetadata = currentProject.config.columnMetadata.map(col => 
+            col.index === columnIndex 
+              ? { ...col, type, autoDetected: false }
+              : col
+          );
+
+          const updatedProject = {
+            ...currentProject,
+            config: {
+              ...currentProject.config,
+              columnMetadata: updatedMetadata,
+            },
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      getOpenQuestionColumns: () => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata.filter(col => col.type === 'open');
+      },
+
+      getClosedQuestionColumns: () => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata.filter(col => col.type === 'closed');
+      },
+
+      getDemographicColumns: () => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata.filter(col => col.type === 'demographic');
+      },
 
       getLabelStats: () => {
         const { cellLabels, rowLabels } = get();

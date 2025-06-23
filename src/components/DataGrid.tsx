@@ -4,20 +4,52 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Grid, Tag, RowsIcon } from 'lucide-react';
+import { Grid, Tag, RowsIcon, Filter, User, BarChart3, MessageSquare, Plus } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
+import { ColumnType } from '../types/analysis';
 import CellNavigator from './CellNavigator';
 import ColumnSelector from './ColumnSelector';
 
-const DataGrid = () => {
-  const { excelData, labels, cellLabels, rowLabels, addCellLabel, removeCellLabel, addRowLabel, removeRowLabel } = useAnalysisStore();
+const colors = [
+  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
+];
+
+  const DataGrid = () => {
+  const { 
+    excelData, 
+    labels, 
+    cellLabels, 
+    rowLabels, 
+    addCellLabel, 
+    removeCellLabel, 
+    addRowLabel, 
+    removeRowLabel,
+    addLabel,
+    currentProject,
+    getOpenQuestionColumns,
+    getClosedQuestionColumns,
+    getDemographicColumns
+  } = useAnalysisStore();
+  
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [isLabelingOpen, setIsLabelingOpen] = useState(false);
   const [labelingType, setLabelingType] = useState<'cell' | 'row'>('cell');
   const [visibleColumns, setVisibleColumns] = useState<boolean[]>([]);
+  const [columnTypeFilter, setColumnTypeFilter] = useState<ColumnType | 'all'>('all');
+  
+  // States per creazione etichette inline
+  const [isCreatingLabel, setIsCreatingLabel] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelDescription, setNewLabelDescription] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
 
   // Inizializza le colonne visibili quando i dati Excel cambiano
   React.useEffect(() => {
@@ -53,12 +85,63 @@ const DataGrid = () => {
     setVisibleColumns(new Array(excelData.headers.length).fill(false));
   };
 
-  // Filtra le colonne visibili
-  const getVisibleColumnIndex = (originalIndex: number) => {
-    return visibleColumns.slice(0, originalIndex).filter(Boolean).length;
+  // Filtra le colonne visibili e per tipo
+  const getFilteredColumns = () => {
+    if (!currentProject) return excelData.headers.map((_, index) => index);
+    
+    const columnMetadata = currentProject.config.columnMetadata;
+    return excelData.headers.map((_, index) => index).filter(index => {
+      // Filtra per tipo
+      if (columnTypeFilter !== 'all') {
+        const columnMeta = columnMetadata.find(meta => meta.index === index);
+        if (!columnMeta || columnMeta.type !== columnTypeFilter) {
+          return false;
+        }
+      }
+      // Filtra per visibilità
+      return visibleColumns[index];
+    });
   };
 
-  const visibleHeaders = excelData.headers.filter((_, index) => visibleColumns[index]);
+  const getVisibleColumnIndex = (originalIndex: number) => {
+    const filteredColumns = getFilteredColumns();
+    return filteredColumns.indexOf(originalIndex);
+  };
+
+  const filteredColumnIndexes = getFilteredColumns();
+  const visibleHeaders = filteredColumnIndexes.map(index => excelData.headers[index]);
+
+  const getColumnType = (columnIndex: number) => {
+    if (!currentProject) return null;
+    const columnMeta = currentProject.config.columnMetadata.find(meta => meta.index === columnIndex);
+    return columnMeta?.type || null;
+  };
+
+  const getColumnTypeIcon = (type: ColumnType | null) => {
+    switch (type) {
+      case 'demographic':
+        return <User className="h-3 w-3" />;
+      case 'closed':
+        return <BarChart3 className="h-3 w-3" />;
+      case 'open':
+        return <MessageSquare className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
+  const getColumnTypeColor = (type: ColumnType | null) => {
+    switch (type) {
+      case 'demographic':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'closed':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'open':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
 
   const getCellLabels = (rowIndex: number, colIndex: number) => {
     const cellId = `${rowIndex}-${colIndex}`;
@@ -110,6 +193,34 @@ const DataGrid = () => {
         removeRowLabel(selectedRow, labelId);
       }
     }
+  };
+
+  const handleCreateLabel = () => {
+    if (!newLabelName.trim()) {
+      toast({
+        title: "Errore",
+        description: "Il nome dell'etichetta è obbligatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addLabel({
+      name: newLabelName.trim(),
+      description: newLabelDescription.trim(),
+      color: newLabelColor,
+    });
+    
+    toast({
+      title: "Etichetta creata",
+      description: `Etichetta "${newLabelName}" creata con successo`,
+    });
+
+    // Reset form
+    setNewLabelName('');
+    setNewLabelDescription('');
+    setNewLabelColor(colors[0]);
+    setIsCreatingLabel(false);
   };
 
   const handleNavigateToCell = (rowIndex: number, colIndex: number) => {
@@ -172,10 +283,43 @@ const DataGrid = () => {
               <Grid className="h-6 w-6 text-primary" />
               Dati Excel - {excelData.fileName}
             </CardTitle>
-            <CellNavigator 
-              onNavigateToCell={handleNavigateToCell}
-              onBulkLabel={handleBulkLabel}
-            />
+            <div className="flex items-center gap-3">
+              {currentProject && (
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <Select value={columnTypeFilter} onValueChange={(value: ColumnType | 'all') => setColumnTypeFilter(value)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutte le colonne</SelectItem>
+                      <SelectItem value="open">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" />
+                          Solo aperte
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="closed">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" />
+                          Solo chiuse
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="demographic">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Solo anagrafiche
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <CellNavigator 
+                onNavigateToCell={handleNavigateToCell}
+                onBulkLabel={handleBulkLabel}
+              />
+            </div>
           </div>
         </CardHeader>
         
@@ -185,13 +329,23 @@ const DataGrid = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16 sticky left-0 bg-background z-10">#</TableHead>
-                  {excelData.headers.map((header, index) => 
-                    visibleColumns[index] ? (
-                      <TableHead key={index} className="min-w-32">
-                        {header || `Colonna ${index + 1}`}
-                      </TableHead>
-                    ) : null
-                  )}
+                  {filteredColumnIndexes.map((colIndex, displayIndex) => (
+                    <TableHead key={colIndex} className="min-w-32">
+                      <div className="space-y-1">
+                        <div className="font-medium">
+                          {excelData.headers[colIndex] || `Colonna ${colIndex + 1}`}
+                        </div>
+                        {currentProject && (
+                          <Badge 
+                            className={`text-xs gap-1 ${getColumnTypeColor(getColumnType(colIndex))}`}
+                          >
+                            {getColumnTypeIcon(getColumnType(colIndex))}
+                            {getColumnType(colIndex)}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               
@@ -242,9 +396,7 @@ const DataGrid = () => {
                           )}
                         </div>
                       </TableCell>
-                      {row.map((cell, colIndex) => {
-                        if (!visibleColumns[colIndex]) return null;
-                        
+                      {filteredColumnIndexes.map((colIndex) => {
                         const cellLabels = getCellLabels(rowIndex, colIndex);
                         
                         return (
@@ -255,7 +407,7 @@ const DataGrid = () => {
                             data-cell={`${rowIndex}-${colIndex}`}
                           >
                             <div className="min-h-8 flex flex-col gap-1">
-                              <span className="text-sm">{cell || ''}</span>
+                              <span className="text-sm">{row[colIndex] || ''}</span>
                               {cellLabels.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {cellLabels.map(labelId => {
@@ -330,7 +482,79 @@ const DataGrid = () => {
             </div>
             
             <div className="space-y-3">
-              <h4 className="font-medium">Etichette disponibili:</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Etichette disponibili:</h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreatingLabel(!isCreatingLabel)}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuova Etichetta
+                </Button>
+              </div>
+              
+              {isCreatingLabel && (
+                <div className="p-3 border rounded-lg bg-muted/20 space-y-3">
+                  <div>
+                    <Label htmlFor="new-label-name">Nome *</Label>
+                    <Input
+                      id="new-label-name"
+                      value={newLabelName}
+                      onChange={(e) => setNewLabelName(e.target.value)}
+                      placeholder="Nome dell'etichetta"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="new-label-description">Descrizione</Label>
+                    <Textarea
+                      id="new-label-description"
+                      value={newLabelDescription}
+                      onChange={(e) => setNewLabelDescription(e.target.value)}
+                      placeholder="Descrizione opzionale"
+                      className="mt-1"
+                      rows={2}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Colore</Label>
+                    <div className="flex gap-2 mt-2">
+                      {colors.map(color => (
+                        <button
+                          key={color}
+                          className={`w-6 h-6 rounded-full border-2 ${
+                            newLabelColor === color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setNewLabelColor(color)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreateLabel}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Crea
+                    </Button>
+                    <Button
+                      onClick={() => setIsCreatingLabel(false)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Annulla
+                    </Button>
+                  </div>
+                </div>
+              )}
               
               {labels.length === 0 ? (
                 <p className="text-sm text-muted-foreground">

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,16 +5,30 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Rows, Tag } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { ChevronLeft, ChevronRight, Rows, Tag, Plus } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
 
+const colors = [
+  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
+];
+
 const SingleRowView = () => {
-  const { excelData, labels, cellLabels, rowLabels, addCellLabel, removeCellLabel, addRowLabel, removeRowLabel } = useAnalysisStore();
+  const { excelData, labels, cellLabels, rowLabels, addCellLabel, removeCellLabel, addRowLabel, removeRowLabel, addLabel } = useAnalysisStore();
   const [selectedRow, setSelectedRow] = useState<number>(0);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [isLabelingOpen, setIsLabelingOpen] = useState(false);
   const [labelingType, setLabelingType] = useState<'cell' | 'row'>('cell');
+  
+  // Stati per creazione etichette inline
+  const [isCreatingLabel, setIsCreatingLabel] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelDescription, setNewLabelDescription] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
 
   if (!excelData) return null;
 
@@ -104,6 +117,34 @@ const SingleRowView = () => {
         });
       }
     }
+  };
+
+  const handleCreateLabel = () => {
+    if (!newLabelName.trim()) {
+      toast({
+        title: "Errore",
+        description: "Il nome dell'etichetta è obbligatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addLabel({
+      name: newLabelName.trim(),
+      description: newLabelDescription.trim(),
+      color: newLabelColor,
+    });
+    
+    toast({
+      title: "Etichetta creata",
+      description: `Etichetta "${newLabelName}" creata con successo`,
+    });
+
+    // Reset form
+    setNewLabelName('');
+    setNewLabelDescription('');
+    setNewLabelColor(colors[0]);
+    setIsCreatingLabel(false);
   };
 
   const selectedLabels = labelingType === 'cell' && selectedCell 
@@ -275,7 +316,79 @@ const SingleRowView = () => {
             </div>
             
             <div className="space-y-3">
-              <h4 className="font-medium">Etichette disponibili:</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Etichette disponibili:</h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreatingLabel(!isCreatingLabel)}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuova Etichetta
+                </Button>
+              </div>
+              
+              {isCreatingLabel && (
+                <div className="p-3 border rounded-lg bg-muted/20 space-y-3">
+                  <div>
+                    <Label htmlFor="new-label-name">Nome *</Label>
+                    <Input
+                      id="new-label-name"
+                      value={newLabelName}
+                      onChange={(e) => setNewLabelName(e.target.value)}
+                      placeholder="Nome dell'etichetta"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="new-label-description">Descrizione</Label>
+                    <Textarea
+                      id="new-label-description"
+                      value={newLabelDescription}
+                      onChange={(e) => setNewLabelDescription(e.target.value)}
+                      placeholder="Descrizione opzionale"
+                      className="mt-1"
+                      rows={2}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Colore</Label>
+                    <div className="flex gap-2 mt-2">
+                      {colors.map(color => (
+                        <button
+                          key={color}
+                          className={`w-6 h-6 rounded-full border-2 ${
+                            newLabelColor === color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setNewLabelColor(color)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreateLabel}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Crea
+                    </Button>
+                    <Button
+                      onClick={() => setIsCreatingLabel(false)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Annulla
+                    </Button>
+                  </div>
+                </div>
+              )}
               
               {labels.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -306,6 +419,56 @@ const SingleRowView = () => {
                       </label>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Creazione nuova etichetta */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreatingLabel(!isCreatingLabel)}
+                className="w-full justify-start"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {isCreatingLabel ? 'Annulla' : 'Crea Nuova Etichetta'}
+              </Button>
+              
+              {isCreatingLabel && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="label-name">Nome Etichetta</Label>
+                      <Input
+                        id="label-name"
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                        placeholder="Inserisci nome etichetta"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="label-description">Descrizione Etichetta</Label>
+                    <Textarea
+                      id="label-description"
+                      value={newLabelDescription}
+                      onChange={(e) => setNewLabelDescription(e.target.value)}
+                      placeholder="Inserisci descrizione etichetta"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <Button 
+                    onClick={handleCreateLabel}
+                    className="w-full"
+                  >
+                    Crea Etichetta
+                  </Button>
                 </div>
               )}
             </div>
