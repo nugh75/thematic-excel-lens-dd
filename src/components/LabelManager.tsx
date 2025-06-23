@@ -6,7 +6,11 @@ import { Tag, Brain, Target, Sparkles } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { AILabelGenerator } from './AILabelGenerator';
 import LabelManagerAdvanced from './LabelManagerAdvanced';
-import { AISuggestionAssistant } from './AISuggestionAssistant';
+
+// Import del componente AI Suggestion Assistant
+const AISuggestionAssistant = React.lazy(() => import('./AISuggestionAssistant').then(module => ({
+  default: module.AISuggestionAssistant
+})));
 
 export function LabelManager() {
   const { labels, excelData } = useAnalysisStore();
@@ -64,11 +68,11 @@ export function LabelManager() {
               </TabsTrigger>
               <TabsTrigger value="ai-generate" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Generazione AI
+                Genera Nuove Etichette
               </TabsTrigger>
               <TabsTrigger value="ai-suggest" className="flex items-center gap-2">
                 <Brain className="h-4 w-4" />
-                Suggerimenti AI
+                Suggerisci Etichette
               </TabsTrigger>
             </TabsList>
 
@@ -83,7 +87,7 @@ export function LabelManager() {
                     <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessun Dato Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Carica un file Excel per utilizzare la generazione AI di etichette
+                      Carica un file Excel per generare automaticamente nuove etichette con l'AI
                     </p>
                   </CardContent>
                 </Card>
@@ -99,7 +103,7 @@ export function LabelManager() {
                     <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessun Dato Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Carica un file Excel per utilizzare i suggerimenti AI di etichette
+                      Carica un file Excel per ricevere suggerimenti su quali etichette usare
                     </p>
                   </CardContent>
                 </Card>
@@ -109,7 +113,7 @@ export function LabelManager() {
                     <Tag className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessuna Etichetta Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Crea almeno un'etichetta per utilizzare i suggerimenti AI
+                      Crea almeno un'etichetta per ricevere suggerimenti AI su come utilizzarle
                     </p>
                     <Button 
                       onClick={() => setActiveTab('manage')} 
@@ -121,7 +125,16 @@ export function LabelManager() {
                   </CardContent>
                 </Card>
               ) : (
-                <AISuggestionAssistant />
+                <React.Suspense fallback={
+                  <Card>
+                    <CardContent className="text-center py-12">
+                      <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50 animate-pulse" />
+                      <h3 className="font-medium mb-2">Caricamento Suggerimenti AI...</h3>
+                    </CardContent>
+                  </Card>
+                }>
+                  <AISuggestionAssistant />
+                </React.Suspense>
               )}
             </TabsContent>
           </Tabs>

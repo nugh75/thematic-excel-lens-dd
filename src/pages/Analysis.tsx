@@ -5,6 +5,7 @@ import ExcelUploader from '../components/ExcelUploader';
 import LabelManager from '../components/LabelManager';
 import ProjectSettings from '../components/ProjectSettings';
 import { AISettingsPanel } from '../components/AISettingsPanel';
+import AISystemPromptConfig from '../components/AISystemPromptConfig';
 import { AIConsultant } from '../components/AIConsultant';
 import { AIFloatingButton } from '../components/AIFloatingButton';
 import DataGrid from '../components/DataGrid';
@@ -91,6 +92,7 @@ const Analysis = () => {
               <TabsTrigger value="projects">Progetti</TabsTrigger>
               <TabsTrigger value="settings">Impostazioni</TabsTrigger>
               <TabsTrigger value="ai-settings">AI Config</TabsTrigger>
+              <TabsTrigger value="ai-prompts">AI Prompt</TabsTrigger>
               <TabsTrigger value="config">Config</TabsTrigger>
               <TabsTrigger value="data">Dati</TabsTrigger>
               <TabsTrigger value="labels">Etichette</TabsTrigger>
@@ -113,6 +115,10 @@ const Analysis = () => {
             
             <TabsContent value="ai-settings" className="space-y-6">
               <AISettingsPanel />
+            </TabsContent>
+            
+            <TabsContent value="ai-prompts" className="space-y-6">
+              <AISystemPromptConfig />
             </TabsContent>
             
             <TabsContent value="config" className="space-y-6">

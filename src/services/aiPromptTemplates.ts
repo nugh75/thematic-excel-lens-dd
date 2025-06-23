@@ -149,3 +149,52 @@ Rispondi solo con:
     (data) => data.advice.length > 10
   ]
 };
+
+/**
+ * Interfaccia per i prompt di sistema personalizzati
+ */
+export interface CustomSystemPrompts {
+  labelGeneration?: string;
+  labelSuggestion?: string;
+  generalAdvice?: string;
+}
+
+/**
+ * Recupera i prompt di sistema personalizzati dal localStorage
+ */
+export function getCustomSystemPrompts(): CustomSystemPrompts {
+  try {
+    const saved = localStorage.getItem('ai-system-prompts');
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    console.error('Errore nel caricamento dei prompt personalizzati:', error);
+    return {};
+  }
+}
+
+/**
+ * Ottiene il prompt di sistema per un tipo specifico, con fallback al predefinito
+ */
+export function getSystemPrompt(type: keyof CustomSystemPrompts): string {
+  const customPrompts = getCustomSystemPrompts();
+  const customPrompt = customPrompts[type];
+  
+  if (customPrompt && customPrompt.trim()) {
+    return customPrompt;
+  }
+  
+  // Fallback ai prompt predefiniti
+  switch (type) {
+    case 'labelGeneration':
+      const labelGenMsg = LABEL_GENERATION_TEMPLATE.systemMessage;
+      return typeof labelGenMsg === 'function' ? labelGenMsg() : labelGenMsg;
+    case 'labelSuggestion':
+      const labelSugMsg = LABEL_SUGGESTION_TEMPLATE.systemMessage;
+      return typeof labelSugMsg === 'function' ? labelSugMsg() : labelSugMsg;
+    case 'generalAdvice':
+      const adviceMsg = GENERAL_ADVICE_TEMPLATE.systemMessage;
+      return typeof adviceMsg === 'function' ? adviceMsg() : adviceMsg;
+    default:
+      return 'Sei un assistente AI specializzato in analisi tematica qualitativa.';
+  }
+}

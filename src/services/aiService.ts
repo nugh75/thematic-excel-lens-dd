@@ -1,8 +1,10 @@
-import { robustAIPipeline, type AIProcessingResult } from './robustAIPipeline';
+import { robustAIPipeline, type AIProcessingResult, type AIPromptTemplate } from './robustAIPipeline';
 import { 
   LABEL_GENERATION_TEMPLATE, 
   LABEL_SUGGESTION_TEMPLATE, 
-  GENERAL_ADVICE_TEMPLATE 
+  GENERAL_ADVICE_TEMPLATE,
+  getSystemPrompt,
+  type CustomSystemPrompts
 } from './aiPromptTemplates';
 
 export interface AIModel {
@@ -477,9 +479,11 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
       existingLabels: existingLabels.join(', ')
     };
 
+    const customTemplate = this.getCustomTemplate(LABEL_GENERATION_TEMPLATE, 'labelGeneration');
+
     return await robustAIPipeline.processWithRetry<AISuggestionResponse>(
       this,
-      LABEL_GENERATION_TEMPLATE,
+      customTemplate,
       promptData,
       { maxAttempts: 3, delayMs: 1500 }
     );
@@ -507,9 +511,11 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
       responsesToAnalyze: responsesText
     };
 
+    const customTemplate = this.getCustomTemplate(LABEL_SUGGESTION_TEMPLATE, 'labelSuggestion');
+
     return await robustAIPipeline.processWithRetry<{ suggestions: any[] }>(
       this,
-      LABEL_SUGGESTION_TEMPLATE,
+      customTemplate,
       promptData,
       { maxAttempts: 3, delayMs: 1000 }
     );
@@ -526,9 +532,11 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
     
     const promptData = { context, question };
 
+    const customTemplate = this.getCustomTemplate(GENERAL_ADVICE_TEMPLATE, 'generalAdvice');
+
     return await robustAIPipeline.processWithRetry<{ advice: string; suggestions?: string[] }>(
       this,
-      GENERAL_ADVICE_TEMPLATE,
+      customTemplate,
       promptData,
       { maxAttempts: 2, delayMs: 1000 }
     );
@@ -590,6 +598,17 @@ Mantieni la risposta concisa ma informativa (massimo 200 parole).
     // Se tutto fallisce, restituisci null
     console.error('Impossibile parsare risposta AI come JSON:', response);
     return null;
+  }
+
+  /**
+   * Ottiene un template con prompt di sistema personalizzato se disponibile
+   */
+  private getCustomTemplate(baseTemplate: AIPromptTemplate, promptType: keyof CustomSystemPrompts): AIPromptTemplate {
+    const customPrompt = getSystemPrompt(promptType);
+    return {
+      ...baseTemplate,
+      systemMessage: customPrompt
+    };
   }
 }
 
