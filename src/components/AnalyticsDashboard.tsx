@@ -1,11 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { BarChart as BarChartIcon, PieChart as PieChartIcon, TrendingUp } from 'lucide-react';
+import { BarChart as BarChartIcon, PieChart as PieChartIcon, TrendingUp, BarChart3 } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
+import { ColumnLabelStats } from './ColumnLabelStats';
 
 const AnalyticsDashboard = () => {
   const { excelData, labels, cellLabels, getLabelStats } = useAnalysisStore();
@@ -48,9 +50,21 @@ const AnalyticsDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 fade-in">
-      {/* Statistiche Generali */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <Tabs defaultValue="overview" className="space-y-6 fade-in">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="overview" className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          Panoramica Generale
+        </TabsTrigger>
+        <TabsTrigger value="columns" className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Statistiche per Colonna
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-6">
+        {/* Statistiche Generali */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -206,28 +220,12 @@ const AnalyticsDashboard = () => {
           )}
         </CardContent>
       </Card>
+      </TabsContent>
 
-      {/* Statistiche Gerarchia */}
-      {Object.keys(hierarchyStats).length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Struttura Gerarchica</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {Object.entries(hierarchyStats).map(([level, count]) => (
-                <div key={level} className="flex justify-between items-center">
-                  <span className="text-sm">
-                    {level === '0' ? 'Etichette Principali' : `Livello ${level}`}
-                  </span>
-                  <Badge variant="outline">{count} etichette</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+      <TabsContent value="columns">
+        <ColumnLabelStats />
+      </TabsContent>
+    </Tabs>
   );
 };
 

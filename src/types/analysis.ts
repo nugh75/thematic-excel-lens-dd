@@ -4,7 +4,46 @@ export interface ExcelData {
   fileName: string;
 }
 
-export type ColumnType = 'demographic' | 'closed' | 'open';
+// Tipi per le statistiche delle etichette per colonna
+export interface LabelDistribution {
+  label: string;
+  count: number;
+  percentage: number;
+  examples: string[];
+}
+
+export interface ColumnStatsData {
+  columnIndex: number;
+  columnName: string;
+  columnType: ColumnType;
+  totalRows: number;
+  labeledRows: number;
+  coveragePercentage: number;
+  uniqueLabels: number;
+  labelDistribution: LabelDistribution[];
+}
+
+export interface ColumnStatsFilters {
+  columnType?: ColumnType;
+  minCoverage?: number;
+  searchTerm?: string;
+  sortBy?: 'name' | 'coverage' | 'labels' | 'type';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export type ColumnType = 
+  // Livello 1: Categorie principali
+  | 'demographic' 
+  | 'closed' 
+  | 'open'
+  // Livello 2: Sottotipi per domande chiuse
+  | 'likert'
+  | 'numeric' 
+  | 'multiplechoice'
+  // Livello 3: Sottotipi per domande anagrafiche
+  | 'demographic_multiplechoice'
+  | 'demographic_numeric'
+  | 'demographic_code';
 
 export interface ColumnMetadata {
   index: number;
@@ -14,6 +53,24 @@ export interface ColumnMetadata {
   isRequired?: boolean;
   autoDetected?: boolean;
   sampleValues?: string[];
+  
+  // Configurazioni specifiche per tipo
+  likertScale?: {
+    min: number;
+    max: number;
+    labels?: string[];
+  };
+  multipleChoiceOptions?: string[];
+  numericRange?: {
+    min?: number;
+    max?: number;
+    unit?: string;
+  };
+  codeFormat?: {
+    pattern?: string;
+    prefix?: string;
+    length?: number;
+  };
 }
 
 export interface ProjectConfig {

@@ -88,19 +88,14 @@ const Analysis = () => {
           </div>
         ) : (
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-12">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="projects">Progetti</TabsTrigger>
-              <TabsTrigger value="settings">Impostazioni</TabsTrigger>
-              <TabsTrigger value="ai-settings">AI Config</TabsTrigger>
-              <TabsTrigger value="ai-prompts">AI Prompt</TabsTrigger>
               <TabsTrigger value="config">Config</TabsTrigger>
               <TabsTrigger value="data">Dati</TabsTrigger>
               <TabsTrigger value="labels">Etichette</TabsTrigger>
-              <TabsTrigger value="ai-consultant">AI Consulente</TabsTrigger>
-              <TabsTrigger value="users">Utenti</TabsTrigger>
-              <TabsTrigger value="sessions">Sessioni</TabsTrigger>
-              <TabsTrigger value="conflicts">Conflitti</TabsTrigger>
               <TabsTrigger value="analysis">Analisi</TabsTrigger>
+              <TabsTrigger value="ai-consultant">AI</TabsTrigger>
+              <TabsTrigger value="users">Utenti</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
             
@@ -109,20 +104,36 @@ const Analysis = () => {
               <ExcelUploader />
             </TabsContent>
             
-            <TabsContent value="settings" className="space-y-6">
-              <ProjectSettings />
-            </TabsContent>
-            
-            <TabsContent value="ai-settings" className="space-y-6">
-              <AISettingsPanel />
-            </TabsContent>
-            
-            <TabsContent value="ai-prompts" className="space-y-6">
-              <AISystemPromptConfig />
-            </TabsContent>
-            
             <TabsContent value="config" className="space-y-6">
-              <ColumnConfigurator />
+              <Tabs defaultValue="columns" className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="columns">Colonne</TabsTrigger>
+                  <TabsTrigger value="project">Progetto</TabsTrigger>
+                  <TabsTrigger value="ai-settings">AI Config</TabsTrigger>
+                  <TabsTrigger value="ai-prompts">AI Prompt</TabsTrigger>
+                  <TabsTrigger value="conflicts">Conflitti</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="columns" className="mt-6">
+                  <ColumnConfigurator />
+                </TabsContent>
+                
+                <TabsContent value="project" className="mt-6">
+                  <ProjectSettings />
+                </TabsContent>
+                
+                <TabsContent value="ai-settings" className="mt-6">
+                  <AISettingsPanel />
+                </TabsContent>
+                
+                <TabsContent value="ai-prompts" className="mt-6">
+                  <AISystemPromptConfig />
+                </TabsContent>
+                
+                <TabsContent value="conflicts" className="mt-6">
+                  <ConflictManager />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
             
             <TabsContent value="data" className="space-y-6">
@@ -148,15 +159,20 @@ const Analysis = () => {
             </TabsContent>
             
             <TabsContent value="users" className="space-y-6">
-              <UserManager />
-            </TabsContent>
-            
-            <TabsContent value="sessions" className="space-y-6">
-              <SessionManager />
-            </TabsContent>
-            
-            <TabsContent value="conflicts" className="space-y-6">
-              <ConflictManager />
+              <Tabs defaultValue="users" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="users">Gestione Utenti</TabsTrigger>
+                  <TabsTrigger value="sessions">Sessioni</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="users" className="mt-6">
+                  <UserManager />
+                </TabsContent>
+                
+                <TabsContent value="sessions" className="mt-6">
+                  <SessionManager />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
             
             <TabsContent value="analysis" className="space-y-6">

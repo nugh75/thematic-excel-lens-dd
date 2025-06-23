@@ -64,15 +64,15 @@ export function LabelManager() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manage" className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
-                Gestione Base
+                Gestisci Etichette
               </TabsTrigger>
               <TabsTrigger value="ai-generate" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Genera Nuove Etichette
+                Genera con AI
               </TabsTrigger>
               <TabsTrigger value="ai-suggest" className="flex items-center gap-2">
                 <Brain className="h-4 w-4" />
-                Suggerisci Etichette
+                Applica con AI
               </TabsTrigger>
             </TabsList>
 
@@ -87,12 +87,25 @@ export function LabelManager() {
                     <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessun Dato Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Carica un file Excel per generare automaticamente nuove etichette con l'AI
+                      Carica un file Excel per generare automaticamente nuove etichette con l'AI.<br/>
+                      L'AI analizzerà i contenuti e suggerirà etichette tematiche appropriate.
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                <AILabelGenerator />
+                <div className="space-y-4">
+                  <Card className="border-blue-200 bg-blue-50/50">
+                    <CardContent className="p-4">
+                      <h4 className="font-medium text-blue-900 mb-2">Generazione AI di Nuove Etichette</h4>
+                      <p className="text-sm text-blue-800">
+                        L'AI analizzerà le risposte di una colonna specifica e genererà automaticamente 
+                        nuove etichette tematiche basate sui contenuti. Ideale per iniziare l'analisi 
+                        di domande aperte.
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <AILabelGenerator />
+                </div>
               )}
             </TabsContent>
 
@@ -103,7 +116,8 @@ export function LabelManager() {
                     <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessun Dato Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Carica un file Excel per ricevere suggerimenti su quali etichette usare
+                      Carica un file Excel per ricevere suggerimenti AI su come applicare 
+                      le etichette esistenti alle risposte.
                     </p>
                   </CardContent>
                 </Card>
@@ -113,28 +127,48 @@ export function LabelManager() {
                     <Tag className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-medium mb-2">Nessuna Etichetta Disponibile</h3>
                     <p className="text-sm text-muted-foreground">
-                      Crea almeno un'etichetta per ricevere suggerimenti AI su come utilizzarle
+                      Crea almeno un'etichetta per ricevere suggerimenti AI su come utilizzarle.
+                      Vai alla scheda "Genera con AI" o "Gestisci Etichette" per iniziare.
                     </p>
-                    <Button 
-                      onClick={() => setActiveTab('manage')} 
-                      className="mt-4"
-                      variant="outline"
-                    >
-                      Vai alla Gestione Etichette
-                    </Button>
+                    <div className="flex gap-2 mt-4 justify-center">
+                      <Button 
+                        onClick={() => setActiveTab('ai-generate')} 
+                        variant="outline"
+                      >
+                        Genera con AI
+                      </Button>
+                      <Button 
+                        onClick={() => setActiveTab('manage')} 
+                        variant="outline"
+                      >
+                        Gestisci Etichette
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ) : (
-                <React.Suspense fallback={
-                  <Card>
-                    <CardContent className="text-center py-12">
-                      <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50 animate-pulse" />
-                      <h3 className="font-medium mb-2">Caricamento Suggerimenti AI...</h3>
+                <div className="space-y-4">
+                  <Card className="border-green-200 bg-green-50/50">
+                    <CardContent className="p-4">
+                      <h4 className="font-medium text-green-900 mb-2">Applicazione AI di Etichette Esistenti</h4>
+                      <p className="text-sm text-green-800">
+                        L'AI suggerirà quali etichette esistenti applicare a ciascuna risposta, 
+                        analizzando il contenuto e fornendo un punteggio di confidenza. 
+                        Perfetto per velocizzare l'etichettatura di grandi dataset.
+                      </p>
                     </CardContent>
                   </Card>
-                }>
-                  <AISuggestionAssistant />
-                </React.Suspense>
+                  <React.Suspense fallback={
+                    <Card>
+                      <CardContent className="text-center py-12">
+                        <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50 animate-pulse" />
+                        <h3 className="font-medium mb-2">Caricamento Suggerimenti AI...</h3>
+                      </CardContent>
+                    </Card>
+                  }>
+                    <AISuggestionAssistant />
+                  </React.Suspense>
+                </div>
               )}
             </TabsContent>
           </Tabs>

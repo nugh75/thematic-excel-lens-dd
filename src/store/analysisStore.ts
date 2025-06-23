@@ -21,18 +21,12 @@ interface AnalysisStore extends ThematicAnalysis {
   removeUser: (userId: string) => void;
   updateUser: (userId: string, updates: Partial<User>) => void;
   
-  // Session management
-  createSession: (name: string) => void;
-  loadSession: (sessionId: string) => void;
-  saveCurrentSession: () => void;
-  deleteSession: (sessionId: string) => void;
-  
-  // Project management
+  // Project management methods
   createProject: (name: string, description: string, excelData: ExcelData) => void;
   loadProject: (projectId: string) => void;
   saveCurrentProject: () => void;
   deleteProject: (projectId: string) => void;
-  updateProject: (projectId: string, updates: Partial<Pick<Project, 'name' | 'description'>>) => void;
+  updateProject: (projectId: string, updates: Partial<Project>) => void;
   addCollaborator: (projectId: string, userId: string) => void;
   removeCollaborator: (projectId: string, userId: string) => void;
   switchProject: (projectId: string) => void;
@@ -43,6 +37,12 @@ interface AnalysisStore extends ThematicAnalysis {
   getOpenQuestionColumns: () => ColumnMetadata[];
   getClosedQuestionColumns: () => ColumnMetadata[];
   getDemographicColumns: () => ColumnMetadata[];
+  
+  // Session management
+  createSession: (name: string) => void;
+  loadSession: (sessionId: string) => void;
+  saveCurrentSession: () => void;
+  deleteSession: (sessionId: string) => void;
   
   // Conflict resolution
   getConflicts: () => ConflictResolution[];
@@ -68,22 +68,59 @@ const autoDetectColumnType = (headerName: string, sampleValues: string[]): Colum
     'età', 'age', 'sesso', 'sex', 'genere', 'gender', 'città', 'city', 'provincia', 'region',
     'titolo', 'education', 'istruzione', 'lavoro', 'job', 'professione', 'profession',
     'nome', 'name', 'cognome', 'surname', 'email', 'telefono', 'phone', 'indirizzo', 'address',
-    'codice', 'id', 'anagrafica', 'demographic'
+    'cap', 'codice', 'id', 'anagrafica', 'demographic', 'stato civile', 'marital'
   ];
   
-  // Check if header matches demographic keywords
+  // Check for demographic fields first
   if (demographicKeywords.some(keyword => header.includes(keyword))) {
-    return 'demographic';
+    // More specific demographic typing
+    if (header.includes('età') || header.includes('age') || header.includes('anno')) {
+      return 'demographic_numeric';
+    }
+    if (header.includes('cap') || header.includes('codice') || header.includes('id')) {
+      return 'demographic_code';
+    }
+    // Default demographic to multiple choice (gender, education, etc.)
+    return 'demographic_multiplechoice';
   }
   
-  // Analyze sample values to determine if closed or open
+  // Question type indicators
+  const likertKeywords = ['scala', 'scale', 'valuta', 'rate', 'rating', 'soddisfazione', 'satisfaction', 'accordo'];
+  const numericKeywords = ['numero', 'number', 'quantità', 'quantity', 'prezzo', 'price', 'euro', 'dollaro', 'valore'];
+  
+  // Analyze sample values
   if (sampleValues.length > 0) {
     const uniqueValues = [...new Set(sampleValues)];
     const avgLength = sampleValues.reduce((sum, val) => sum + val.length, 0) / sampleValues.length;
     
-    // If few unique values and short text, likely closed question
+    // Check if values look like numeric
+    const numericValues = sampleValues.map(v => parseFloat(v)).filter(v => !isNaN(v));
+    if (numericValues.length > sampleValues.length * 0.8) {
+      // Check if it's a Likert scale (1-5, 1-7, 1-10)
+      const likertValues = numericValues.filter(v => v >= 1 && v <= 10 && Number.isInteger(v));
+      if (likertValues.length > sampleValues.length * 0.7) {
+        const min = Math.min(...likertValues);
+        const max = Math.max(...likertValues);
+        if (min === 1 && (max === 5 || max === 7 || max === 10)) {
+          return 'likert';
+        }
+      }
+      return 'numeric';
+    }
+    
+    // Check for Likert keywords in header
+    if (likertKeywords.some(keyword => header.includes(keyword))) {
+      return 'likert';
+    }
+    
+    // Check for numeric keywords in header
+    if (numericKeywords.some(keyword => header.includes(keyword))) {
+      return 'numeric';
+    }
+    
+    // If few unique values and short text, likely multiple choice
     if (uniqueValues.length <= 10 && avgLength <= 50) {
-      return 'closed';
+      return 'multiplechoice';
     }
     
     // If many unique values or long text, likely open question
