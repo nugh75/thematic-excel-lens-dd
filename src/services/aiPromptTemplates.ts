@@ -90,14 +90,15 @@ JSON RICHIESTO:
   ]
 }`,
 
-  fallbackPrompt: `Suggerisci etichette per queste risposte: {{responsesToAnalyze}}
+  fallbackPrompt: `Analizza queste risposte e suggerisci etichette: {{responsesToAnalyze}}
 
 Etichette disponibili: {{availableLabels}}
 
-Rispondi solo con:
+IMPORTANTE: Rispondi SOLO in formato JSON senza altro testo.
+
 {
   "suggestions": [
-    {"responseIndex": 0, "suggestedLabelId": "prima_etichetta_disponibile", "confidence": 60, "reasoning": "Analisi automatica"}
+    {"responseIndex": 0, "suggestedLabelId": "prima_etichetta_disponibile", "confidence": 60, "reasoning": "Analisi automatica - verifica manualmente"}
   ]
 }`,
 

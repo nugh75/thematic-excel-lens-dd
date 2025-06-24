@@ -8,6 +8,7 @@ import { Loader2, Target, CheckCircle, X, Brain, RefreshCw, ArrowRight } from 'l
 import { aiService } from '../services/aiService';
 import { useAnalysisStore } from '../store/analysisStore';
 import { useToast } from '../hooks/use-toast';
+import { AIErrorDiagnostic } from './AIErrorDiagnostic';
 
 interface ResponseSuggestion {
   responseText: string;
@@ -24,6 +25,7 @@ export function AISuggestionAssistant() {
   const [suggestions, setSuggestions] = useState<ResponseSuggestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState<string>('');
+  const [rawResponse, setRawResponse] = useState<string>('');
   const [autoMode, setAutoMode] = useState(false);
   
   const { excelData, labels, addCellLabel, cellLabels } = useAnalysisStore();
@@ -98,14 +100,61 @@ export function AISuggestionAssistant() {
           description: `L'AI ha analizzato ${suggestionsWithText.length} risposte dopo ${result.attempts} tentativo/i.`,
         });
       } else {
-        throw new Error(result.error || 'La pipeline robusta non è riuscita ad analizzare le risposte');
+        // Gestione più dettagliata degli errori AI
+        const errorMessage = getDetailedErrorMessage(result.error, result.rawResponse);
+        setRawResponse(result.rawResponse || '');
+        throw new Error(errorMessage);
       }
     } catch (err: any) {
       console.error('Errore analisi AI:', err);
-      setError(err.message || 'Errore durante l\'analisi delle risposte.');
+      
+      // Feedback migliorato per l'utente
+      const userFriendlyMessage = getUserFriendlyErrorMessage(err.message);
+      setError(userFriendlyMessage);
+      
+      toast({
+        title: "Errore nell'analisi AI",
+        description: userFriendlyMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Funzione helper per messaggi di errore dettagliati  
+  const getDetailedErrorMessage = (error: string | undefined, rawResponse: string | undefined): string => {
+    if (error?.includes('Impossibile parsare la risposta')) {
+      return `L'AI ha fornito una risposta in formato non riconosciuto. Prova a:
+• Riformulare il prompt più specificamente
+• Verificare che il modello AI sia appropriato per questo tipo di analisi
+• Ridurre il numero di risposte da analizzare`;
+    }
+    
+    if (error?.includes('timeout') || error?.includes('network')) {
+      return 'Problema di connessione con il servizio AI. Verifica la connessione e riprova.';
+    }
+    
+    return error || 'La pipeline robusta non è riuscita ad analizzare le risposte';
+  };
+
+  // Funzione helper per messaggi user-friendly
+  const getUserFriendlyErrorMessage = (errorMessage: string): string => {
+    if (errorMessage.includes('formato non riconosciuto')) {
+      return 'L\'AI ha difficoltà a comprendere questo tipo di contenuto. Prova con un dataset più semplice o verifica le impostazioni AI.';
+    }
+    
+    if (errorMessage.includes('connessione')) {
+      return 'Problema di connessione al servizio AI. Controlla le impostazioni nella sezione "AI Config".';
+    }
+    
+    if (errorMessage.includes('parsare la risposta')) {
+      return 'Risposta AI non valida. Il modello potrebbe non essere adatto per questo tipo di analisi.';
+    }
+    
+    return errorMessage.length > 100 ? 
+      'Errore nell\'analisi AI. Verifica le impostazioni e riprova.' : 
+      errorMessage;
   };
 
   const getCurrentSuggestion = () => suggestions[currentIndex] || null;
@@ -291,11 +340,20 @@ export function AISuggestionAssistant() {
           </div>
         </div>
 
-        {/* Errori */}
+        {/* Errori con diagnostica migliorata */}
         {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <AIErrorDiagnostic 
+            error={error}
+            rawResponse={rawResponse}
+            onRetry={analyzeResponses}
+            onConfigureAI={() => {
+              // Redirect to AI config (implementare se necessario)
+              toast({
+                title: "Configurazione AI",
+                description: "Vai alla sezione 'AI Config' per configurare le impostazioni AI."
+              });
+            }}
+          />
         )}
 
         {/* Suggerimenti */}

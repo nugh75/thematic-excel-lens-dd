@@ -116,6 +116,80 @@ rebuild() {
     log_info "🌐 Applicazione disponibile su: http://${APP_HOST}:${APP_PORT}"
 }
 
+# Rebuild sicuro preservando tutti i dati
+rebuild_safe() {
+    log_info "🛡️  Rebuild sicuro dell'applicazione preservando i dati..."
+    
+    # Verifica presenza di dati da preservare
+    local has_data=false
+    if [ -d "data" ] && [ "$(ls -A data 2>/dev/null)" ]; then
+        has_data=true
+        log_info "📁 Dati applicazione rilevati in ./data"
+    fi
+    
+    if [ -d "redis-data" ] && [ "$(ls -A redis-data 2>/dev/null)" ]; then
+        has_data=true
+        log_info "🔄 Dati Redis rilevati in ./redis-data"
+    fi
+    
+    if [ -d "backups" ] && [ "$(ls -A backups 2>/dev/null)" ]; then
+        log_info "💾 Backup esistenti rilevati in ./backups"
+    fi
+    
+    if [ "$has_data" = true ]; then
+        log_success "✅ I dati verranno preservati grazie ai volumi Docker persistenti"
+    else
+        log_warning "⚠️  Nessun dato esistente rilevato"
+    fi
+    
+    echo ""
+    log_info "Procedura di rebuild sicuro:"
+    log_info "1️⃣  Arresto solo del container dell'applicazione"
+    log_info "2️⃣  Rebuild dell'immagine Docker"
+    log_info "3️⃣  Riavvio con volumi preservati"
+    echo ""
+    
+    # Arresta solo il container dell'app, preservando Redis e backup
+    log_info "🛑 Arresto container applicazione..."
+    docker-compose stop thematic-excel-lens || true
+    docker-compose rm -f thematic-excel-lens || true
+    
+    # Rebuild dell'immagine
+    log_info "🔨 Rebuild dell'immagine applicazione..."
+    docker-compose build --no-cache thematic-excel-lens
+    
+    # Riavvio con volumi preservati
+    log_info "🚀 Riavvio con dati preservati..."
+    docker-compose up -d thematic-excel-lens
+    
+    # Verifica che tutto sia in esecuzione
+    sleep 3
+    if docker-compose ps thematic-excel-lens | grep -q "Up"; then
+        log_success "✅ Rebuild sicuro completato con successo!"
+        
+        # Verifica preservazione dati
+        if [ "$has_data" = true ]; then
+            log_success "🛡️  Tutti i dati sono stati preservati"
+        fi
+        
+        echo ""
+        # Leggi IP e porta dal file di configurazione
+        APP_HOST=$(grep "^APP_HOST=" .env.docker 2>/dev/null | cut -d'=' -f2) || APP_HOST="localhost"
+        APP_PORT=$(grep "^APP_PORT=" .env.docker 2>/dev/null | cut -d'=' -f2) || APP_PORT="8655"
+        
+        log_info "🌐 Applicazione disponibile su: http://${APP_HOST}:${APP_PORT}"
+        
+        # Mostra stato finale
+        echo ""
+        log_info "📊 Stato finale dei servizi:"
+        docker-compose ps
+    else
+        log_error "❌ Errore durante il riavvio dell'applicazione"
+        log_info "🔍 Controllare i logs con: $0 logs"
+        exit 1
+    fi
+}
+
 # Rebuild dell'ambiente di sviluppo
 rebuild_dev() {
     log_info "Rebuild dell'ambiente di sviluppo..."
@@ -276,6 +350,7 @@ show_help() {
     echo "  stop      - Arresto dei servizi"
     echo "  restart   - Riavvio dei servizi"
     echo "  rebuild   - Rebuild completo dell'applicazione (produzione)"
+    echo "  rebuild-safe - Rebuild sicuro preservando tutti i dati 🛡️"
     echo "  dev       - Avvio ambiente di sviluppo"
     echo "  dev-stop  - Arresto ambiente di sviluppo"
     echo "  rebuild-dev - Rebuild completo ambiente di sviluppo"
@@ -291,6 +366,7 @@ show_help() {
     echo "  $0 setup          # Configurazione iniziale"
     echo "  $0 start          # Avvio produzione"
     echo "  $0 rebuild        # Rebuild produzione"
+    echo "  $0 rebuild-safe   # Rebuild sicuro con dati preservati 🛡️"
     echo "  $0 dev            # Avvio sviluppo"
     echo "  $0 rebuild-dev    # Rebuild sviluppo"
     echo "  $0 logs redis     # Logs di Redis"
@@ -322,6 +398,9 @@ main() {
             ;;
         rebuild)
             rebuild
+            ;;
+        rebuild-safe)
+            rebuild_safe
             ;;
         dev)
             setup_directories

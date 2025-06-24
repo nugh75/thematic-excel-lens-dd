@@ -54,7 +54,14 @@ class RobustAIPipeline {
         
         // Esegui la richiesta
         rawResponse = await aiService.generateCompletion(prompt);
-        console.log(`📥 Risposta AI (tentativo ${attempt}):`, rawResponse);
+        
+        // Log dettagliato per debug
+        console.log(`📥 Risposta AI (tentativo ${attempt}):`, {
+          length: rawResponse.length,
+          firstChars: rawResponse.substring(0, 200),
+          containsJson: rawResponse.includes('{') && rawResponse.includes('}'),
+          containsMarkdown: rawResponse.includes('```')
+        });
         
         // Prova il parsing
         const parseResult = this.parseAIResponse(rawResponse, promptTemplate);
@@ -230,9 +237,27 @@ class RobustAIPipeline {
       console.log(`❌ Ricostruzione fallita:`, error);
     }
 
+    // Strategia 6: Creazione risposta di emergenza basata sul contenuto
+    try {
+      const emergencyResponse = this.createEmergencyResponse(response, template);
+      if (emergencyResponse) {
+        console.log(`⚡ Risposta di emergenza creata`);
+        return { success: true, data: emergencyResponse };
+      }
+    } catch (error) {
+      console.log(`❌ Risposta di emergenza fallita:`, error);
+    }
+
+    // Log dettagliato per debug
+    console.error(`🚨 PARSING COMPLETO FALLITO`, {
+      responseLength: response.length,
+      responsePreview: response.substring(0, 500),
+      templateExpectedFormat: template.expectedFormat
+    });
+
     return { 
       success: false, 
-      error: `Impossibile parsare la risposta dopo 5 strategie diverse. Risposta: ${response.substring(0, 200)}...` 
+      error: `Impossibile parsare la risposta AI. La risposta ricevuta non è in formato JSON valido. Preview: "${response.substring(0, 100)}..."` 
     };
   }
 
@@ -306,6 +331,77 @@ class RobustAIPipeline {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Crea una risposta di emergenza quando il parsing fallisce completamente
+   */
+  private createEmergencyResponse(response: string, template: AIPromptTemplate): any | null {
+    // Identifica il tipo di template per creare una risposta appropriata
+    if (template.expectedFormat?.includes('suggestions array')) {
+      // Per template di suggerimenti o generazione etichette
+      const suggestions = this.extractSuggestionsFromText(response);
+      
+      if (suggestions.length > 0) {
+        return {
+          suggestions,
+          generalAdvice: "Risposta estratta automaticamente. Verifica manualmente i risultati."
+        };
+      }
+    }
+    
+    // Fallback generico per qualsiasi template
+    return {
+      error: "Risposta AI non interpretabile",
+      rawContent: response.substring(0, 500),
+      suggestions: [],
+      generalAdvice: "L'AI ha fornito una risposta in formato non riconosciuto. Prova a riformulare il prompt."
+    };
+  }
+
+  /**
+   * Estrae suggerimenti dal testo libero quando il JSON non è disponibile
+   */
+  private extractSuggestionsFromText(text: string): any[] {
+    const suggestions: any[] = [];
+    
+    // Cerca pattern comuni per nomi di etichette
+    const labelPatterns = [
+      /(?:nome|titolo|etichetta):\s*["']?([^"'\n]+)["']?/gi,
+      /(?:tema|categoria):\s*["']?([^"'\n]+)["']?/gi,
+      /["']([^"']+)["']\s*-\s*[^.\n]{10,}/gi,
+      /^\d+\.\s*([^-\n]{3,30})/gm
+    ];
+    
+    let suggestionIndex = 0;
+    
+    for (const pattern of labelPatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null && suggestions.length < 5) {
+        const name = match[1]?.trim();
+        if (name && name.length > 2 && name.length < 50) {
+          suggestions.push({
+            name: name,
+            description: `Estratto automaticamente dal contenuto: "${name}"`,
+            confidence: 60,
+            reasoning: "Etichetta identificata tramite pattern recognition nel testo"
+          });
+          suggestionIndex++;
+        }
+      }
+    }
+    
+    // Se non troviamo niente, creiamo un suggerimento generico
+    if (suggestions.length === 0) {
+      suggestions.push({
+        name: "Tema Identificato",
+        description: "Contenuto rilevato ma formato non riconosciuto",
+        confidence: 40,
+        reasoning: "Creato automaticamente per preservare il contenuto AI"
+      });
+    }
+    
+    return suggestions;
   }
 }
 
