@@ -81,7 +81,32 @@ export type ColumnType =
   | 'demographic_profession'// Professione
   | 'demographic_other';    // Altre informazioni anagrafiche
 
+// Sistema di classificazione gerarchico unificato
 export interface ColumnClassification {
+  type: 'anagrafica' | 'non_anagrafica' | 'non_classificata';
+  subtype: 'chiusa' | 'aperta' | null;
+  category: string | null; // Ora accetta qualsiasi stringa per categorie personalizzate
+  confidence: number;
+  aiGenerated: boolean;
+  classifiedAt?: number;
+  classifiedBy?: 'user' | 'ai' | 'auto';
+}
+
+// Categorie predefinite per riferimento
+export const PREDEFINED_CATEGORIES = {
+  anagrafica: [
+    'età', 'genere', 'titolo_studio', 'professione', 'stato_civile', 
+    'residenza', 'nazionalità', 'reddito', 'nucleo_familiare', 
+    'settore_lavorativo', 'esperienza_lavorativa', 'lingua', 'disabilità'
+  ],
+  non_anagrafica: [
+    'scala_likert', 'rating_numerico', 'scelta_multipla', 'scelta_singola',
+    'si_no', 'vero_falso', 'graduatoria', 'matrice'
+  ]
+} as const;
+
+// Legacy interface mantenuta per compatibilità con il vecchio sistema
+export interface LegacyColumnClassification {
   level1: 'demographic' | 'non_demographic';
   level2?: 'closed' | 'open' | 'age' | 'gender' | 'location' | 'education' | 'profession' | 'other';
   level3?: 'structured' | 'unstructured' | 'numeric' | 'likert' | 'yesno' | 'multichoice' | 'singlechoice';
@@ -90,6 +115,48 @@ export interface ColumnClassification {
   autoDetected?: boolean;
   classifiedAt?: number;
   classifiedBy?: 'user' | 'ai' | 'auto';
+}
+
+// Nuovi types per operazioni batch
+export interface BatchClassificationOperation {
+  selectedColumns: number[];
+  step: ClassificationStep;
+  classification: Partial<ColumnClassification>;
+  timestamp: number;
+  operationId: string;
+}
+
+export interface ColumnSelectionState {
+  selectedColumns: Set<number>;
+  selectAll: boolean;
+  selectionMode: 'manual' | 'pattern' | 'type';
+  filterPattern?: string;
+  filterType?: ColumnType;
+}
+
+export enum ClassificationStep {
+  SELECTION = 'selection',
+  LEVEL1 = 'level1',
+  LEVEL2 = 'level2', 
+  LEVEL3 = 'level3',
+  PREVIEW = 'preview',
+  COMPLETE = 'complete'
+}
+
+export interface BatchClassificationState {
+  currentStep: ClassificationStep;
+  selectionState: ColumnSelectionState;
+  pendingClassification: Partial<ColumnClassification>;
+  previewChanges: Array<{
+    columnIndex: number;
+    columnName: string;
+    oldType?: ColumnType;
+    newType: ColumnType;
+    oldClassification?: ColumnClassification;
+    newClassification: ColumnClassification;
+  }>;
+  canUndo: boolean;
+  operationHistory: BatchClassificationOperation[];
 }
 
 export interface ColumnMetadata {

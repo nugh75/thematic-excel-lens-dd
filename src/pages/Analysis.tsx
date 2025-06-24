@@ -24,7 +24,7 @@ import DataViewSelector from '../components/DataViewSelector';
 import SingleColumnView from '../components/SingleColumnView';
 import SingleRowView from '../components/SingleRowView';
 import ProjectManager from '../components/ProjectManager';
-import ColumnConfigurator from '../components/ColumnConfigurator';
+import ColumnConfiguration from '../components/ColumnConfiguration';
 import { useAnalysisStore } from '../store/analysisStore';
 
 const Analysis = () => {
@@ -126,7 +126,7 @@ const Analysis = () => {
                 </TabsList>
                 
                 <TabsContent value="columns" className="mt-6">
-                  <ColumnConfigurator />
+                  <ColumnConfiguration />
                 </TabsContent>
                 
                 <TabsContent value="project" className="mt-6">

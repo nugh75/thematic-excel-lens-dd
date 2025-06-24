@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Tag, Brain, Target, Sparkles, BarChart3 } from 'lucide-react';
+import { Tag, Brain, Target, Sparkles } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { AILabelGenerator } from './AILabelGenerator';
 import LabelManagerAdvanced from './LabelManagerAdvanced';
-import ColumnClassifier from './ColumnClassifier';
 
 // Import del componente AI Suggestion Assistant
 const AISuggestionAssistant = React.lazy(() => import('./AISuggestionAssistant').then(module => ({
@@ -15,7 +14,7 @@ const AISuggestionAssistant = React.lazy(() => import('./AISuggestionAssistant')
 
 export function LabelManager() {
   const { labels, excelData } = useAnalysisStore();
-  const [activeTab, setActiveTab] = useState('classify');
+  const [activeTab, setActiveTab] = useState('manage');
 
   const hasData = excelData && excelData.rows.length > 0;
 
@@ -62,11 +61,7 @@ export function LabelManager() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="classify" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Classifica Colonne
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manage" className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
                 Gestisci Etichette
@@ -80,10 +75,6 @@ export function LabelManager() {
                 Applica con AI
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="classify" className="mt-6">
-              <ColumnClassifier />
-            </TabsContent>
 
             <TabsContent value="manage" className="mt-6">
               <LabelManagerAdvanced />

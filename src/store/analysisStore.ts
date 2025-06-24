@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ThematicAnalysis, Label, CellLabel, RowLabel, ExcelData, User, LabelingSession, ConflictResolution, Project, ColumnMetadata, ColumnType } from '../types/analysis';
+import { 
+  ThematicAnalysis, 
+  Label, 
+  CellLabel, 
+  RowLabel, 
+  ExcelData, 
+  User, 
+  LabelingSession, 
+  ConflictResolution, 
+  Project, 
+  ColumnMetadata, 
+  ColumnType, 
+  ColumnClassification 
+} from '../types/analysis';
 
 interface AnalysisStore extends ThematicAnalysis {
   setExcelData: (data: ExcelData) => void;
@@ -35,6 +48,22 @@ interface AnalysisStore extends ThematicAnalysis {
   configureColumns: (columnMetadata: ColumnMetadata[]) => void;
   updateColumnType: (columnIndex: number, type: ColumnType) => void;
   updateColumnMetadata: (metadata: ColumnMetadata) => void;
+  
+  // Batch classification functions
+  bulkClassifyColumns: (columnIndexes: number[], classification: Partial<ColumnClassification>) => void;
+  updateMultipleColumnMetadata: (updates: Array<{index: number, metadata: Partial<ColumnMetadata>}>) => void;
+  selectColumnsByPattern: (pattern: string, caseSensitive?: boolean) => number[];
+  selectColumnsByType: (type: ColumnType, includeUnclassified?: boolean) => number[];
+  selectColumnsByRange: (startIndex: number, endIndex: number) => number[];
+  previewBatchClassification: (columnIndexes: number[], classification: Partial<ColumnClassification>) => Array<{
+    columnIndex: number;
+    columnName: string;
+    oldType?: ColumnType;
+    newType: ColumnType;
+    oldClassification?: ColumnClassification;
+    newClassification: ColumnClassification;
+  }>;
+  
   getOpenQuestionColumns: () => ColumnMetadata[];
   getClosedQuestionColumns: () => ColumnMetadata[];
   getDemographicColumns: () => ColumnMetadata[];
@@ -134,6 +163,8 @@ const autoDetectColumnType = (headerName: string, sampleValues: string[]): Colum
   // Default to open for unknown cases
   return 'open';
 };
+
+
 
 export const useAnalysisStore = create<AnalysisStore>()(
   persist(
@@ -580,6 +611,141 @@ export const useAnalysisStore = create<AnalysisStore>()(
         }
       },
 
+      bulkClassifyColumns: (columnIndexes, classification) => {
+        const { currentProject } = get();
+        if (currentProject) {
+          const updatedMetadata = currentProject.config.columnMetadata.map(col => {
+            if (columnIndexes.includes(col.index)) {
+              const updatedClassification: ColumnClassification = {
+                level1: classification.level1 || col.classification?.level1 || 'non_demographic',
+                level2: classification.level2 || col.classification?.level2,
+                level3: classification.level3 || col.classification?.level3,
+                finalType: classification.finalType || col.type,
+                confidence: classification.confidence || 90,
+                autoDetected: false,
+                classifiedAt: Date.now(),
+                classifiedBy: 'user'
+              };
+
+              return {
+                ...col,
+                type: classification.finalType || col.type,
+                classification: updatedClassification,
+                autoDetected: false
+              };
+            }
+            return col;
+          });
+
+          const updatedProject = {
+            ...currentProject,
+            config: {
+              ...currentProject.config,
+              columnMetadata: updatedMetadata,
+            },
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      updateMultipleColumnMetadata: (updates) => {
+        const { currentProject } = get();
+        if (currentProject) {
+          const updatedMetadata = currentProject.config.columnMetadata.map(col => {
+            const update = updates.find(u => u.index === col.index);
+            return update ? { ...col, ...update.metadata, autoDetected: false } : col;
+          });
+
+          const updatedProject = {
+            ...currentProject,
+            config: {
+              ...currentProject.config,
+              columnMetadata: updatedMetadata,
+            },
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      selectColumnsByPattern: (pattern, caseSensitive = false) => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata
+          .map((col, index) => ({ ...col, index }))
+          .filter(col => {
+            const columnName = col.name;
+            const regex = new RegExp(pattern, caseSensitive ? '' : 'i');
+            return regex.test(columnName);
+          })
+          .map(col => col.index);
+      },
+
+      selectColumnsByType: (type, includeUnclassified = false) => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata
+          .map((col, index) => ({ ...col, index }))
+          .filter(col => includeUnclassified 
+            ? col.type === type || col.autoDetected === true 
+            : col.type === type
+          )
+          .map(col => col.index);
+      },
+
+      selectColumnsByRange: (startIndex, endIndex) => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata
+          .map((col, index) => ({ ...col, index }))
+          .filter(col => col.index >= startIndex && col.index <= endIndex)
+          .map(col => col.index);
+      },
+
+      previewBatchClassification: (columnIndexes, classification) => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+        return currentProject.config.columnMetadata
+          .map((col, index) => ({ ...col, index }))
+          .filter(col => columnIndexes.includes(col.index))
+          .map(col => {
+            const oldType = col.type;
+            const newType = classification.finalType || oldType;
+            const oldClassification = col.classification;
+            
+            const newClassification: ColumnClassification = {
+              level1: classification.level1 || oldClassification?.level1 || 'non_demographic',
+              level2: classification.level2 || oldClassification?.level2,
+              level3: classification.level3 || oldClassification?.level3,
+              finalType: classification.finalType || oldType,
+              confidence: classification.confidence || 90,
+              autoDetected: false,
+              classifiedAt: Date.now(),
+              classifiedBy: 'user'
+            };
+            
+            return {
+              columnIndex: col.index,
+              columnName: col.name,
+              oldType,
+              newType,
+              oldClassification,
+              newClassification,
+            };
+          });
+      },
+      
       getOpenQuestionColumns: () => {
         const { currentProject } = get();
         if (!currentProject) return [];

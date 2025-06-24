@@ -7,6 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Switch } from './ui/switch';
 import { 
   Users, 
   BarChart3, 
@@ -17,7 +18,9 @@ import {
   Eye,
   Save,
   RotateCcw,
-  Brain
+  Brain,
+  Zap,
+  List
 } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { 
@@ -27,15 +30,23 @@ import {
 } from '../types/analysis';
 import { Alert, AlertDescription } from './ui/alert';
 import { useToast } from '../hooks/use-toast';
+import MultiSelectColumnList from './MultiSelectColumnList';
+import BatchClassificationWizard from './BatchClassificationWizardNew';
 
 export function ColumnClassifier() {
-  const { excelData, columnMetadata, updateColumnMetadata } = useAnalysisStore();
+  const { excelData, columnMetadata, updateColumnMetadata, bulkClassifyColumns } = useAnalysisStore();
   const { toast } = useToast();
   
+  // State per modalità singola
   const [selectedColumn, setSelectedColumn] = useState<number | null>(null);
   const [currentClassification, setCurrentClassification] = useState<ColumnClassification | null>(null);
   const [description, setDescription] = useState('');
   const [previewData, setPreviewData] = useState<string[]>([]);
+
+  // State per modalità batch
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<Set<number>>(new Set());
+  const [showBatchWizard, setShowBatchWizard] = useState(false);
 
   useEffect(() => {
     if (selectedColumn !== null && excelData) {
@@ -151,6 +162,43 @@ export function ColumnClassifier() {
     setDescription('');
   };
 
+  // Funzioni per modalità batch
+  const handleBatchComplete = (columnIndexes: number[], classification: Partial<ColumnClassification>) => {
+    try {
+      bulkClassifyColumns(columnIndexes, classification);
+      toast({
+        title: "Classificazione batch completata",
+        description: `${columnIndexes.length} colonne sono state classificate con successo`,
+      });
+      setShowBatchWizard(false);
+      setSelectedColumns(new Set());
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Si è verificato un errore durante la classificazione batch",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const startBatchClassification = () => {
+    if (selectedColumns.size === 0) {
+      toast({
+        title: "Selezione richiesta",
+        description: "Seleziona almeno una colonna per iniziare la classificazione batch",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowBatchWizard(true);
+  };
+
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedColumns(new Set());
+    setSelectedColumn(null);
+  };
+
   const getTypeLabel = (type: ColumnType): string => {
     const labels: Record<ColumnType, string> = {
       'demographic': 'Anagrafica',
@@ -203,24 +251,94 @@ export function ColumnClassifier() {
     );
   }
 
+  // Se il wizard batch è aperto, mostra solo quello
+  if (showBatchWizard) {
+    return (
+      <BatchClassificationWizard
+        selectedColumns={Array.from(selectedColumns)}
+        onComplete={handleBatchComplete}
+        onCancel={() => setShowBatchWizard(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Classificazione delle Colonne</h3>
-          <p className="text-sm text-muted-foreground">
-            Classifica ogni colonna secondo lo schema: Anagrafiche/Non Anagrafiche → Chiuse/Aperte → Sottotipi specifici
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Classificazione delle Colonne</h3>
+            <p className="text-sm text-muted-foreground">
+              Classifica ogni colonna secondo lo schema: Anagrafiche/Non Anagrafiche → Chiuse/Aperte → Sottotipi specifici
+            </p>
+          </div>
+          
+          {/* Toggle modalità batch */}
+          <Card className="p-4">
+            <div className="flex items-center space-x-3">
+              <List className="w-4 h-4 text-gray-500" />
+              <Label htmlFor="batch-mode" className="text-sm font-medium">
+                Modalità Batch
+              </Label>
+              <Switch
+                id="batch-mode"
+                checked={batchMode}
+                onCheckedChange={toggleBatchMode}
+              />
+              <Zap className="w-4 h-4 text-blue-500" />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {batchMode ? 'Classifica più colonne contemporaneamente' : 'Classifica una colonna alla volta'}
+            </p>
+          </Card>
         </div>
 
-        {/* Selezione colonna */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Seleziona Colonna da Classificare
-            </CardTitle>
-          </CardHeader>
+        {batchMode ? (
+          // Modalità batch
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Classificazione Batch
+                </CardTitle>
+                <CardDescription>
+                  Seleziona più colonne e applicagli una classificazione comune
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MultiSelectColumnList
+                  selectedColumns={selectedColumns}
+                  onSelectionChange={setSelectedColumns}
+                />
+                
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    {selectedColumns.size} colonne selezionate
+                  </div>
+                  <Button 
+                    onClick={startBatchClassification}
+                    disabled={selectedColumns.size === 0}
+                    className="flex items-center gap-2"
+                  >
+                    <Brain className="w-4 h-4" />
+                    Avvia Classificazione Batch
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          // Modalità singola (contenuto esistente)
+          <div className="space-y-4">
+            {/* Selezione colonna */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Seleziona Colonna da Classificare
+                </CardTitle>
+              </CardHeader>
           <CardContent>
             <Select 
               value={selectedColumn?.toString() || ""} 
@@ -531,6 +649,8 @@ export function ColumnClassifier() {
               </div>
             </CardContent>
           </Card>
+        )}
+        </div>
         )}
       </div>
     </div>

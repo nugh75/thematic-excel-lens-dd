@@ -19,6 +19,11 @@ const NavigationHeader = () => {
       icon: BarChart3
     },
     {
+      path: '/configuration',
+      label: 'Configurazione',
+      icon: Settings
+    },
+    {
       path: '/instructions',
       label: 'Guida Utente',
       icon: BookOpen
