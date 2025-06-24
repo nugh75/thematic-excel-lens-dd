@@ -30,12 +30,14 @@ export function AILabelGenerator() {
   const aiSettings = aiService.getSettings();
 
   const defaultPrompts = [
-    'Crea etichette per categorizzare le risposte in base ai temi principali emersi',
-    'Identifica pattern emotivi nelle risposte e crea etichette appropriate',
-    'Analizza le risposte e crea etichette basate sui problemi o bisogni identificati',
-    'Classifica le risposte in base al livello di soddisfazione o gradimento',
-    'Identifica categorie demografiche o comportamentali nelle risposte',
-    'Crea etichette per tematiche positive e negative nelle risposte'
+    'Crea etichette per categorizzare le risposte in base ai temi principali emersi. Identifica i macro-argomenti e le categorie tematiche ricorrenti.',
+    'Identifica pattern emotivi nelle risposte e crea etichette appropriate per emozioni, sentimenti e stati d\'animo espressi (es: gioia, frustrazione, soddisfazione, preoccupazione).',
+    'Analizza le risposte e crea etichette basate sui problemi, bisogni, criticità o richieste specifiche identificate nelle risposte.',
+    'Classifica le risposte in base al livello di soddisfazione, gradimento o valutazione espressa (es: molto soddisfatto, parzialmente soddisfatto, insoddisfatto).',
+    'Identifica categorie demografiche, comportamentali o caratteristiche degli utenti che emergono dalle risposte (es: età, esperienza, ruolo, competenze).',
+    'Crea etichette per distinguere feedback positivi, negativi, neutri e suggerimenti di miglioramento nelle risposte.',
+    'Analizza le risposte per identificare priorità, urgenze o importanza relativa dei temi trattati.',
+    'Categorizza le risposte in base al tipo di contenuto: opinioni personali, fatti oggettivi, proposte, domande, lamentele.'
   ];
 
   const generateLabels = async () => {
@@ -172,8 +174,12 @@ export function AILabelGenerator() {
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return 'bg-green-100 text-green-800 border-green-200';
-    if (confidence >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (confidence >= 80) {
+      return 'bg-green-100 text-green-800 border-green-200';
+    }
+    if (confidence >= 60) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    }
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
@@ -240,20 +246,41 @@ export function AILabelGenerator() {
           />
           
           {/* Prompt suggeriti */}
-          <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">Prompt suggeriti:</label>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-muted-foreground">Prompt suggeriti (clicca per usare):</label>
+            <div className="space-y-2">
               {defaultPrompts.map((prompt, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setUserPrompt(prompt)}
-                  className="text-xs h-auto py-1 px-2"
-                >
-                  {prompt.substring(0, 50)}...
-                </Button>
+                <div key={index} className="group">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setUserPrompt(prompt)}
+                    className="w-full text-left justify-start h-auto py-3 px-4 whitespace-normal leading-relaxed hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    title={`Clicca per usare: ${prompt}`}
+                  >
+                    <div className="flex items-start gap-2 w-full">
+                      <Sparkles className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-gray-700 break-words">
+                        {prompt}
+                      </span>
+                    </div>
+                  </Button>
+                </div>
               ))}
+            </div>
+            
+            {/* Suggerimento per l'utente */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Brain className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-700">
+                  <p className="font-medium mb-1">💡 Suggerimento:</p>
+                  <p>
+                    Puoi personalizzare questi prompt o scriverne uno completamente nuovo. 
+                    Sii specifico su cosa vuoi categorizzare (es: emozioni, temi, problemi, etc.).
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -299,39 +326,50 @@ export function AILabelGenerator() {
               </div>
             </div>
 
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
               {suggestions.map((suggestion, index) => (
                 <div
                   key={index}
-                  className={`border rounded-lg p-4 transition-colors ${
-                    suggestion.selected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
+                  className={`border rounded-lg p-4 transition-all hover:shadow-md ${
+                    suggestion.selected 
+                      ? 'border-blue-300 bg-blue-50 shadow-sm' 
+                      : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={suggestion.selected}
                       onCheckedChange={() => toggleSelection(index)}
-                      className="mt-1"
+                      className="mt-1 flex-shrink-0"
                     />
                     
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h5 className="font-medium">{suggestion.name}</h5>
+                    <div className="flex-1 space-y-3 min-w-0">
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <h5 className="font-medium text-gray-900 break-words flex-1">
+                          {suggestion.name}
+                        </h5>
                         <Badge 
                           variant="secondary" 
-                          className={getConfidenceColor(suggestion.confidence)}
+                          className={`${getConfidenceColor(suggestion.confidence)} flex-shrink-0`}
                         >
                           {suggestion.confidence}% confidenza
                         </Badge>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground">
-                        {suggestion.description}
-                      </p>
+                      <div className="bg-gray-50 p-3 rounded border max-h-20 overflow-y-auto">
+                        <p className="text-sm text-muted-foreground break-words whitespace-pre-wrap">
+                          {suggestion.description}
+                        </p>
+                      </div>
                       
-                      <p className="text-xs text-gray-600 italic">
-                        <strong>Ragionamento:</strong> {suggestion.reasoning}
-                      </p>
+                      <div className="bg-blue-50 p-3 rounded border max-h-24 overflow-y-auto">
+                        <div className="text-xs text-gray-700">
+                          <span className="font-medium text-blue-800">Ragionamento AI:</span>
+                          <p className="mt-1 italic break-words whitespace-pre-wrap leading-relaxed">
+                            {suggestion.reasoning}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -452,11 +452,17 @@ export function ColumnLabelStats() {
                               
                               return stat.labelDistribution.slice(0, 8).map((dist, idx) => (
                                 <div key={idx} className="space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <Badge variant="outline" className="text-xs max-w-[120px] truncate">
-                                      {dist.label}
-                                    </Badge>
-                                    <span className="text-sm font-medium">
+                                  <div className="flex justify-between items-start gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <Badge 
+                                        variant="outline" 
+                                        className="text-xs break-words whitespace-normal h-auto py-1 px-2"
+                                        title={dist.label}
+                                      >
+                                        {dist.label}
+                                      </Badge>
+                                    </div>
+                                    <span className="text-sm font-medium flex-shrink-0">
                                       {dist.count} occorrenze
                                     </span>
                                   </div>
@@ -491,18 +497,20 @@ export function ColumnLabelStats() {
                                           <span className="text-blue-600">Scorri per vedere tutto</span>
                                         )}
                                       </div>
-                                      <ScrollArea className="h-24 border rounded p-2 bg-gray-50">
-                                        <div className="space-y-1 pr-3">
+                                      <ScrollArea className="h-32 border rounded p-3 bg-gray-50">
+                                        <div className="space-y-2 pr-3">
                                           {dist.examples.map((example, exampleIdx) => {
                                             const [value, rowNumber] = example.split('|');
                                             return (
-                                              <div key={exampleIdx} className="flex items-start gap-2 text-xs hover:bg-white rounded px-1 py-0.5 transition-colors">
-                                                <span className="font-mono text-blue-600 min-w-[35px] text-right bg-blue-50 px-1 rounded">
+                                              <div key={exampleIdx} className="flex items-start gap-3 text-xs hover:bg-white rounded p-2 transition-colors border-l-2 border-gray-200 hover:border-blue-300">
+                                                <span className="font-mono text-blue-600 min-w-[40px] text-right bg-blue-50 px-2 py-1 rounded text-[10px] flex-shrink-0">
                                                   #{rowNumber}
                                                 </span>
-                                                <span className="text-gray-700 break-words flex-1 leading-relaxed">
-                                                  {value}
-                                                </span>
+                                                <div className="text-gray-700 break-words flex-1 leading-relaxed max-w-none">
+                                                  <p className="whitespace-pre-wrap break-all">
+                                                    {value}
+                                                  </p>
+                                                </div>
                                               </div>
                                             );
                                           })}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   LogIn, 
   UserPlus, 
@@ -14,17 +15,27 @@ import {
   Shield, 
   Eye, 
   PenTool,
-  Users
+  Users,
+  AlertTriangle,
+  Clock,
+  Key
 } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
+import { AuthService, authLimiter } from '../services/authService';
+import PasswordManager from './PasswordManager';
 
 const LoginComponent = () => {
-  const { users, currentUser, setCurrentUser, addUser } = useAnalysisStore();
+  const { users, currentUser, setCurrentUser, addUser, updateUser } = useAnalysisStore();
   const [showLogin, setShowLogin] = useState(!currentUser);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showPasswordManager, setShowPasswordManager] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(0);
+  const [passwordManagerUser, setPasswordManagerUser] = useState<{ id: string; name: string } | null>(null);
   
   // New user form
   const [newUserName, setNewUserName] = useState('');
@@ -32,7 +43,59 @@ const LoginComponent = () => {
   const [newUserRole, setNewUserRole] = useState<'admin' | 'annotator' | 'viewer'>('annotator');
   const [newUserColor, setNewUserColor] = useState('#3B82F6');
 
-  const handleLogin = () => {
+  // Check for lockout on component mount and user selection
+  useEffect(() => {
+    if (selectedUserId) {
+      const canAttempt = authLimiter.canAttempt(selectedUserId);
+      if (!canAttempt) {
+        const remainingTime = authLimiter.getRemainingLockoutTime(selectedUserId);
+        setLockoutTime(remainingTime);
+        
+        const interval = setInterval(() => {
+          const remaining = authLimiter.getRemainingLockoutTime(selectedUserId);
+          setLockoutTime(remaining);
+          
+          if (remaining <= 0) {
+            clearInterval(interval);
+          }
+        }, 1000);
+        
+        return () => clearInterval(interval);
+      }
+    }
+  }, [selectedUserId]);
+
+  // Create default admin if no users exist
+  useEffect(() => {
+    const initializeDefaultAdmin = async () => {
+      if (users.length === 0) {
+        try {
+          const defaultAdmin = await AuthService.createDefaultAdmin();
+          addUser({
+            name: defaultAdmin.name,
+            email: defaultAdmin.email,
+            color: defaultAdmin.color,
+            role: defaultAdmin.role,
+            isActive: defaultAdmin.isActive,
+            createdAt: defaultAdmin.createdAt,
+            passwordHash: defaultAdmin.passwordHash
+          });
+          
+          toast({
+            title: "Amministratore predefinito creato",
+            description: `Username: ${defaultAdmin.name}, Password: ${defaultAdmin.password}`,
+            duration: 10000,
+          });
+        } catch (error) {
+          console.error('Errore nella creazione dell\'amministratore predefinito:', error);
+        }
+      }
+    };
+    
+    initializeDefaultAdmin();
+  }, [users.length, addUser]);
+
+  const handleLogin = async () => {
     if (!selectedUserId) {
       toast({
         title: "Errore",
@@ -42,24 +105,85 @@ const LoginComponent = () => {
       return;
     }
 
-    if (password !== 'admin123') {
+    const user = users.find(u => u.id === selectedUserId);
+    if (!user) {
       toast({
         title: "Errore",
-        description: "Password non corretta",
+        description: "Utente non trovato",
         variant: "destructive",
       });
       return;
     }
 
-    setCurrentUser(selectedUserId);
-    setShowLogin(false);
-    setPassword(''); // Reset password
-    
-    const user = users.find(u => u.id === selectedUserId);
-    toast({
-      title: "Login effettuato",
-      description: `Benvenuto/a, ${user?.name}!`,
-    });
+    // Check if user is locked out
+    if (!authLimiter.canAttempt(selectedUserId)) {
+      const remainingTime = Math.ceil(authLimiter.getRemainingLockoutTime(selectedUserId) / 1000 / 60);
+      toast({
+        title: "Account bloccato",
+        description: `Troppi tentativi falliti. Riprova tra ${remainingTime} minuti.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!password) {
+      toast({
+        title: "Errore",
+        description: "Inserisci la password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Check if user has a password set
+      if (!user.passwordHash) {
+        toast({
+          title: "Password non impostata",
+          description: "Questo utente non ha una password. Imposta una password prima di continuare.",
+          variant: "destructive",
+        });
+        setPasswordManagerUser({ id: user.id, name: user.name });
+        setShowPasswordManager(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Verify password
+      const isValidPassword = await AuthService.verifyPassword(password, user.passwordHash);
+      
+      if (isValidPassword) {
+        authLimiter.recordSuccess(selectedUserId);
+        setCurrentUser(selectedUserId);
+        setShowLogin(false);
+        setPassword('');
+        setLoginAttempts(0);
+        
+        toast({
+          title: "Login effettuato",
+          description: `Benvenuto/a, ${user.name}!`,
+        });
+      } else {
+        authLimiter.recordFailure(selectedUserId);
+        setLoginAttempts(prev => prev + 1);
+        
+        toast({
+          title: "Errore",
+          description: "Password non corretta",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Errore durante l'autenticazione",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCreateUser = () => {
@@ -87,19 +211,31 @@ const LoginComponent = () => {
       return;
     }
 
-    addUser({
+    // Create user without password first, then prompt for password
+    const newUser = {
       name: newUserName.trim(),
       email: newUserEmail.trim() || undefined,
       color: newUserColor,
       role: newUserRole,
       isActive: true,
       createdAt: Date.now(),
-    });
+    };
+
+    addUser(newUser);
 
     toast({
       title: "Utente creato",
-      description: `Utente "${newUserName}" creato con successo`,
+      description: `Utente "${newUserName}" creato. Ora imposta una password.`,
     });
+
+    // Find the newly created user and open password manager
+    setTimeout(() => {
+      const createdUser = users.find(u => u.name === newUserName.trim());
+      if (createdUser) {
+        setPasswordManagerUser({ id: createdUser.id, name: createdUser.name });
+        setShowPasswordManager(true);
+      }
+    }, 100);
 
     // Reset form
     setNewUserName('');
@@ -107,6 +243,18 @@ const LoginComponent = () => {
     setNewUserRole('annotator');
     setNewUserColor('#3B82F6');
     setShowCreateUser(false);
+  };
+
+  const handlePasswordSet = (hashedPassword: string) => {
+    if (passwordManagerUser) {
+      updateUser(passwordManagerUser.id, { passwordHash: hashedPassword });
+      setPasswordManagerUser(null);
+      
+      toast({
+        title: "Password impostata",
+        description: `Password configurata per ${passwordManagerUser.name}`,
+      });
+    }
   };
 
   const handleLogout = () => {
@@ -159,7 +307,9 @@ const LoginComponent = () => {
 
   if (currentUser) {
     const user = users.find(u => u.id === currentUser.id);
-    if (!user) return null;
+    if (!user) {
+      return null;
+    }
 
     return (
       <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -180,9 +330,21 @@ const LoginComponent = () => {
             <p className="text-sm text-gray-600">{user.email}</p>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          Logout
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setPasswordManagerUser({ id: user.id, name: user.name });
+              setShowPasswordManager(true);
+            }}
+          >
+            <Key className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
       </div>
     );
   }
@@ -198,6 +360,29 @@ const LoginComponent = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Lockout warning */}
+          {lockoutTime > 0 && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Account bloccato per {Math.ceil(lockoutTime / 1000 / 60)} minuti a causa di troppi tentativi falliti.
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Login attempts warning */}
+          {loginAttempts > 0 && lockoutTime === 0 && (
+            <Alert className="border-orange-200 bg-orange-50">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                {loginAttempts} tentativo/i fallito/i. Dopo 5 tentativi l'account verrà bloccato per 15 minuti.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div>
             <Label htmlFor="user-select">Seleziona Utente</Label>
             <Select value={selectedUserId} onValueChange={setSelectedUserId}>
@@ -216,11 +401,16 @@ const LoginComponent = () => {
                           {user.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
+                      <div className="flex items-center gap-2">
                         <span className="font-medium">{user.name}</span>
-                        <Badge className={`ml-2 text-xs ${getRoleColor(user.role || 'annotator')}`}>
+                        <Badge className={`text-xs ${getRoleColor(user.role || 'annotator')}`}>
                           {user.role || 'annotator'}
                         </Badge>
+                        {!user.passwordHash && (
+                          <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                            No password
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </SelectItem>
@@ -238,24 +428,37 @@ const LoginComponent = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Inserisci la password"
               className="mt-1"
+              disabled={lockoutTime > 0}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Password temporanea: <span className="font-mono bg-gray-100 px-1 py-0.5 rounded">admin123</span>
-            </p>
+            {users.length > 0 && users.some(u => !u.passwordHash) && (
+              <p className="text-xs text-orange-600 mt-1">
+                ⚠️ Alcuni utenti non hanno una password impostata. Clicca su "Imposta Password" dopo la creazione.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2">
             <Button 
               onClick={handleLogin} 
               className="flex-1"
-              disabled={!selectedUserId || !password}
+              disabled={!selectedUserId || !password || lockoutTime > 0 || isLoading}
             >
-              <LogIn className="h-4 w-4 mr-2" />
-              Accedi
+              {isLoading ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Accesso...
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Accedi
+                </>
+              )}
             </Button>
             <Button 
               variant="outline" 
               onClick={() => setShowCreateUser(true)}
+              disabled={isLoading}
             >
               <UserPlus className="h-4 w-4" />
             </Button>
@@ -392,6 +595,20 @@ const LoginComponent = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Password Manager Dialog */}
+      {passwordManagerUser && (
+        <PasswordManager
+          isOpen={showPasswordManager}
+          onClose={() => {
+            setShowPasswordManager(false);
+            setPasswordManagerUser(null);
+          }}
+          onPasswordSet={handlePasswordSet}
+          currentUserName={passwordManagerUser.name}
+          isEditing={!!users.find(u => u.id === passwordManagerUser.id)?.passwordHash}
+        />
+      )}
     </>
   );
 };

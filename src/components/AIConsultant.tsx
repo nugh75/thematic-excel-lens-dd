@@ -91,16 +91,17 @@ export function AIConsultant({
         {/* Domande rapide */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Domande rapide:</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {quickQuestions.map((q, index) => (
               <Button
                 key={index}
                 variant="outline"
                 size="sm"
                 onClick={() => setQuestion(q)}
-                className="text-xs"
+                className="text-xs h-auto py-2 px-3 text-left whitespace-normal"
+                title={q}
               >
-                {q}
+                {q.length > 40 ? q.substring(0, 40) + '...' : q}
               </Button>
             ))}
           </div>
@@ -148,15 +149,17 @@ export function AIConsultant({
 
         {/* Risposta AI */}
         {advice && (
-          <Alert>
-            <Lightbulb className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <strong>Consiglio AI:</strong>
-                <div className="whitespace-pre-wrap text-sm">{advice}</div>
+          <div className="border rounded-lg p-4 bg-blue-50">
+            <div className="flex items-start gap-2 mb-2">
+              <Lightbulb className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+              <strong className="text-blue-800">Consiglio AI:</strong>
+            </div>
+            <div className="max-h-60 overflow-y-auto bg-white p-3 rounded border">
+              <div className="whitespace-pre-wrap text-sm break-words leading-relaxed">
+                {advice}
               </div>
-            </AlertDescription>
-          </Alert>
+            </div>
+          </div>
         )}
 
         {/* Contesto */}

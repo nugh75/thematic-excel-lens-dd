@@ -389,8 +389,10 @@ export function AISuggestionAssistant() {
                 <label className="text-sm font-medium text-muted-foreground">
                   Risposta (Riga {currentSuggestion.responseIndex + 1}):
                 </label>
-                <div className="mt-1 p-3 bg-muted/50 rounded border text-sm">
-                  "{currentSuggestion.responseText}"
+                <div className="mt-1 p-3 bg-muted/50 rounded border text-sm max-h-32 overflow-y-auto">
+                  <p className="break-words whitespace-pre-wrap">
+                    "{currentSuggestion.responseText}"
+                  </p>
                 </div>
               </div>
 
@@ -399,17 +401,19 @@ export function AISuggestionAssistant() {
                 <label className="text-sm font-medium text-muted-foreground">
                   Etichetta suggerita:
                 </label>
-                <div className="mt-2 flex items-center gap-3">
+                <div className="mt-2 flex items-center gap-3 flex-wrap">
                   {labelInfo && (
                     <>
-                      <div 
-                        className="w-4 h-4 rounded-full border" 
-                        style={{ backgroundColor: labelInfo.color }}
-                      />
-                      <span className="font-medium">{labelInfo.name}</span>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded-full border flex-shrink-0" 
+                          style={{ backgroundColor: labelInfo.color }}
+                        />
+                        <span className="font-medium break-words">{labelInfo.name}</span>
+                      </div>
                       <Badge 
                         variant="secondary" 
-                        className={getConfidenceColor(currentSuggestion.confidence)}
+                        className={`${getConfidenceColor(currentSuggestion.confidence)} flex-shrink-0`}
                       >
                         {currentSuggestion.confidence}% confidenza
                       </Badge>
@@ -418,9 +422,11 @@ export function AISuggestionAssistant() {
                 </div>
                 
                 {labelInfo?.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {labelInfo.description}
-                  </p>
+                  <div className="mt-2 p-2 bg-gray-50 rounded text-sm max-h-20 overflow-y-auto">
+                    <p className="text-muted-foreground break-words">
+                      {labelInfo.description}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -429,9 +435,11 @@ export function AISuggestionAssistant() {
                 <label className="text-sm font-medium text-muted-foreground">
                   Ragionamento AI:
                 </label>
-                <p className="text-sm mt-1 italic text-gray-600">
-                  {currentSuggestion.reasoning}
-                </p>
+                <div className="mt-1 p-3 bg-blue-50 rounded text-sm max-h-24 overflow-y-auto">
+                  <p className="italic text-gray-700 break-words whitespace-pre-wrap">
+                    {currentSuggestion.reasoning}
+                  </p>
+                </div>
               </div>
 
               {/* Azioni */}

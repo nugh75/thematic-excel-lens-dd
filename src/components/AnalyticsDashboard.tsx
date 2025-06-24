@@ -118,22 +118,42 @@ const AnalyticsDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChartIcon className="h-5 w-5 text-primary" />
-                Distribuzione Etichette
+                Distribuzione Etichette (Occorrenze)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart 
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="name" 
                     angle={-45}
                     textAnchor="end"
-                    height={60}
+                    height={100}
+                    fontSize={12}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
                   />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#3B82F6" />
+                  <YAxis 
+                    fontSize={12}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#3B82F6"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -147,23 +167,56 @@ const AnalyticsDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
+              <ResponsiveContainer width="100%" height={400}>
+                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                   <Pie
                     data={pieChartData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
+                    outerRadius={120}
                     dataKey="count"
-                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    label={({ name, percentage }) => `${name.length > 15 ? name.substring(0, 15) + '...' : name}: ${percentage}%`}
+                    labelLine={false}
+                    fontSize={11}
                   >
                     {pieChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    formatter={(value, name, props) => [
+                      `${value} occorrenze (${props.payload.percentage}%)`,
+                      props.payload.name
+                    ]}
+                    contentStyle={{ 
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '6px'
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
+              
+              {/* Legenda personalizzata per etichette lunghe */}
+              {pieChartData.length > 0 && (
+                <div className="mt-4 space-y-2 max-h-32 overflow-y-auto">
+                  <h4 className="text-sm font-medium text-gray-700">Legenda:</h4>
+                  <div className="grid grid-cols-1 gap-1">
+                    {pieChartData.map((entry, index) => (
+                      <div key={index} className="flex items-center gap-2 text-xs">
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: entry.color }}
+                        />
+                        <span className="truncate" title={entry.name}>
+                          {entry.name} ({entry.count} - {entry.percentage}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

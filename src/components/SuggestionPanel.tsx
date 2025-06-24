@@ -125,17 +125,17 @@ const SuggestionPanel = () => {
             </div>
             
             {suggestions.map((suggestion, index) => (
-              <div key={index} className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-1">
+              <div key={index} className="border rounded-lg p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap gap-1 flex-1 min-w-0">
                     {suggestion.suggestedLabels.map(labelId => (
-                      <Badge key={labelId} variant="secondary">
+                      <Badge key={labelId} variant="secondary" className="text-xs">
                         {getLabelName(labelId)}
                       </Badge>
                     ))}
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <div 
                       className={`w-2 h-2 rounded-full ${getConfidenceColor(suggestion.confidence)}`}
                       title={`Confidenza: ${(suggestion.confidence * 100).toFixed(1)}%`}
@@ -146,9 +146,9 @@ const SuggestionPanel = () => {
                   </div>
                 </div>
                 
-                <p className="text-sm text-muted-foreground">
-                  {suggestion.reason}
-                </p>
+                <div className="bg-gray-50 p-2 rounded text-sm text-muted-foreground max-h-20 overflow-y-auto">
+                  <p className="break-words">{suggestion.reason}</p>
+                </div>
                 
                 <Button 
                   size="sm" 

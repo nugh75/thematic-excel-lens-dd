@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Shield } from 'lucide-react';
 import ExcelUploader from '../components/ExcelUploader';
 import LabelManager from '../components/LabelManager';
 import ProjectSettings from '../components/ProjectSettings';
@@ -11,6 +13,7 @@ import { AIFloatingButton } from '../components/AIFloatingButton';
 import DataGrid from '../components/DataGrid';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import UserManager from '../components/UserManager';
+import UserManagerAdvanced from '../components/UserManagerAdvanced';
 import LoginComponent from '../components/LoginComponent';
 import SessionManager from '../components/SessionManager';
 import ConflictManager from '../components/ConflictManager';
@@ -28,9 +31,14 @@ const Analysis = () => {
     excelData, 
     currentUser, 
     currentProject, 
-    labels
+    labels,
+    users
   } = useAnalysisStore();
   const [dataView, setDataView] = useState<'grid' | 'column' | 'row'>('grid');
+  const [showAdvancedUserManager, setShowAdvancedUserManager] = useState(false);
+
+  const currentUserData = users.find(u => u.id === currentUser?.id);
+  const isAdmin = currentUserData?.role === 'admin';
 
   // Show login screen if no user is logged in
   if (!currentUser) {
@@ -166,7 +174,21 @@ const Analysis = () => {
                 </TabsList>
                 
                 <TabsContent value="users" className="mt-6">
-                  <UserManager />
+                  <div className="space-y-4">
+                    {isAdmin && (
+                      <div className="flex justify-end">
+                        <Button 
+                          variant="outline"
+                          onClick={() => setShowAdvancedUserManager(true)}
+                          className="gap-2"
+                        >
+                          <Shield className="h-4 w-4" />
+                          Gestione Avanzata
+                        </Button>
+                      </div>
+                    )}
+                    <UserManager />
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="sessions" className="mt-6">
@@ -191,6 +213,15 @@ const Analysis = () => {
                    Dataset con ${excelData?.rows?.length || 0} righe e ${excelData?.headers?.length || 0} colonne.
                    Etichette attive: ${labels.length}.`}
         />
+
+        {/* User Manager Avanzato */}
+        {currentUser && (
+          <UserManagerAdvanced
+            isOpen={showAdvancedUserManager}
+            onClose={() => setShowAdvancedUserManager(false)}
+            currentUserId={currentUser.id}
+          />
+        )}
       </div>
     </div>
   );

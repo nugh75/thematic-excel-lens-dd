@@ -114,6 +114,7 @@ export interface User {
   email?: string;
   role?: 'admin' | 'annotator' | 'viewer';
   createdAt?: number;
+  passwordHash?: string;
 }
 
 export interface LabelingSession {

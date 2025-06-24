@@ -147,12 +147,17 @@ export function AISuggestions({ columnName, responses, onLabelCreated }: AISugge
 
         {/* Consiglio generale */}
         {generalAdvice && (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Consiglio AI:</strong> {generalAdvice}
-            </AlertDescription>
-          </Alert>
+          <div className="border rounded-lg p-4 bg-blue-50">
+            <div className="flex items-start gap-2 mb-2">
+              <CheckCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+              <strong className="text-blue-800">Consiglio AI:</strong>
+            </div>
+            <div className="max-h-32 overflow-y-auto bg-white p-3 rounded border">
+              <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">
+                {generalAdvice}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Suggerimenti */}
@@ -162,31 +167,35 @@ export function AISuggestions({ columnName, responses, onLabelCreated }: AISugge
             {suggestions.map((suggestion, index) => (
               <Card key={index} className="border-l-4 border-l-blue-500">
                 <CardContent className="pt-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h5 className="font-medium">{suggestion.name}</h5>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-3 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h5 className="font-medium break-words">{suggestion.name}</h5>
                         <Badge 
                           variant="secondary" 
-                          className={getConfidenceColor(suggestion.confidence)}
+                          className={`${getConfidenceColor(suggestion.confidence)} flex-shrink-0`}
                         >
                           {suggestion.confidence}% confidenza
                         </Badge>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground">
-                        {suggestion.description}
-                      </p>
+                      <div className="bg-gray-50 p-2 rounded max-h-16 overflow-y-auto">
+                        <p className="text-sm text-muted-foreground break-words">
+                          {suggestion.description}
+                        </p>
+                      </div>
                       
-                      <p className="text-xs text-gray-600 italic">
-                        <strong>Ragionamento:</strong> {suggestion.reasoning}
-                      </p>
+                      <div className="bg-blue-50 p-2 rounded max-h-20 overflow-y-auto">
+                        <p className="text-xs text-gray-700 italic break-words">
+                          <strong>Ragionamento:</strong> {suggestion.reasoning}
+                        </p>
+                      </div>
                     </div>
                     
                     <Button
                       size="sm"
                       onClick={() => createLabelFromSuggestion(suggestion)}
-                      className="ml-3"
+                      className="flex-shrink-0"
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Aggiungi
