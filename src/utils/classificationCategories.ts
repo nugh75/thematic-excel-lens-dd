@@ -142,7 +142,23 @@ export const openDemograficCategoryGroups: CategoryGroup[] = [
       { value: 'codice_fiscale_libero', label: 'Codice fiscale (testo libero)' },
       { value: 'numero_documento', label: 'Numero documento' },
       { value: 'codice_pratica', label: 'Codice pratica' },
-      { value: 'numero_tessera', label: 'Numero tessera' }
+      { value: 'numero_tessera', label: 'Numero tessera' },
+      { value: 'codice_rispondente', label: 'Codice rispondente' },
+      { value: 'id_partecipante', label: 'ID partecipante' },
+      { value: 'codice_anonimo', label: 'Codice anonimo' }
+    ]
+  },
+  {
+    group: 'Data e ora',
+    categories: [
+      { value: 'data_nascita_libera', label: 'Data di nascita (testo libero)' },
+      { value: 'data_compilazione', label: 'Data di compilazione' },
+      { value: 'ora_compilazione', label: 'Ora di compilazione' },
+      { value: 'timestamp', label: 'Timestamp' },
+      { value: 'data_ora_compilazione', label: 'Data e ora di compilazione' },
+      { value: 'data_iscrizione', label: 'Data di iscrizione' },
+      { value: 'data_evento', label: 'Data evento' },
+      { value: 'periodo_riferimento', label: 'Periodo di riferimento' }
     ]
   },
   {
@@ -173,6 +189,18 @@ export const openDemograficCategoryGroups: CategoryGroup[] = [
       { value: 'promemoria', label: 'Promemoria' },
       { value: 'osservazioni', label: 'Osservazioni' },
       { value: 'commenti_aggiuntivi', label: 'Commenti aggiuntivi' }
+    ]
+  },
+  {
+    group: 'Informazioni di compilazione',
+    categories: [
+      { value: 'modalita_compilazione', label: 'Modalità di compilazione' },
+      { value: 'dispositivo_utilizzato', label: 'Dispositivo utilizzato' },
+      { value: 'browser_utilizzato', label: 'Browser utilizzato' },
+      { value: 'ip_address', label: 'Indirizzo IP' },
+      { value: 'sessione_id', label: 'ID sessione' },
+      { value: 'tempo_compilazione', label: 'Tempo di compilazione' },
+      { value: 'pagina_provenienza', label: 'Pagina di provenienza' }
     ]
   },
   {

@@ -11,14 +11,10 @@ export const ClassificationSelector: React.FC<ClassificationSelectorProps> = ({
   classification, 
   onChange 
 }) => {
-  const [customCategory, setCustomCategory] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Reset custom input when classification type or subtype changes
+  // Reset search term when classification type or subtype changes
   useEffect(() => {
-    setShowCustomInput(false);
-    setCustomCategory('');
     setSearchTerm('');
   }, [classification.type, classification.subtype]);
 
@@ -33,40 +29,10 @@ export const ClassificationSelector: React.FC<ClassificationSelectorProps> = ({
   };
 
   const handleCategoryChange = (value: string) => {
-    if (value === 'custom') {
-      setShowCustomInput(true);
-      onChange({ 
-        ...classification, 
-        category: null
-      });
-    } else {
-      setShowCustomInput(false);
-      setCustomCategory('');
-      onChange({ 
-        ...classification, 
-        category: value || null
-      });
-    }
-  };
-
-  const handleCustomCategorySubmit = () => {
-    if (customCategory.trim()) {
-      onChange({ 
-        ...classification, 
-        category: customCategory.trim()
-      });
-      setShowCustomInput(false);
-      setCustomCategory('');
-    }
-  };
-
-  const handleCustomCategoryKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleCustomCategorySubmit();
-    } else if (e.key === 'Escape') {
-      setShowCustomInput(false);
-      setCustomCategory('');
-    }
+    onChange({ 
+      ...classification, 
+      category: value || null
+    });
   };
 
   const filteredGroups = getFilteredCategories();
@@ -129,7 +95,7 @@ export const ClassificationSelector: React.FC<ClassificationSelectorProps> = ({
           />
           
           <select
-            value={showCustomInput ? 'custom' : classification.category || ''}
+            value={classification.category || ''}
             onChange={(e) => handleCategoryChange(e.target.value)}
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 max-h-48 overflow-y-auto"
             size={Math.min(8, filteredGroups.reduce((acc, group) => acc + group.categories.length + 1, 1))}
@@ -142,45 +108,7 @@ export const ClassificationSelector: React.FC<ClassificationSelectorProps> = ({
                 ))}
               </optgroup>
             ))}
-            <option value="custom">➕ Categoria personalizzata...</option>
           </select>
-          
-          {showCustomInput && (
-            <div className="mt-2 space-y-2">
-              <input
-                type="text"
-                value={customCategory}
-                onChange={(e) => setCustomCategory(e.target.value)}
-                onKeyDown={handleCustomCategoryKeyPress}
-                placeholder="Inserisci nome categoria personalizzata..."
-                className="w-full p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                autoFocus
-              />
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={handleCustomCategorySubmit}
-                  disabled={!customCategory.trim()}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  Conferma
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCustomInput(false);
-                    setCustomCategory('');
-                  }}
-                  className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
-                >
-                  Annulla
-                </button>
-              </div>
-              <p className="text-xs text-gray-500">
-                Premi Invio per confermare, Esc per annullare
-              </p>
-            </div>
-          )}
         </div>
       )}
     </div>
