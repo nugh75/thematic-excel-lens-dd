@@ -34,20 +34,13 @@ interface AnalysisStore extends ThematicAnalysis {
   // Column configuration
   configureColumns: (columnMetadata: ColumnMetadata[]) => void;
   updateColumnType: (columnIndex: number, type: ColumnType) => void;
+  updateColumnMetadata: (metadata: ColumnMetadata) => void;
   getOpenQuestionColumns: () => ColumnMetadata[];
   getClosedQuestionColumns: () => ColumnMetadata[];
   getDemographicColumns: () => ColumnMetadata[];
   
-  // Session management
-  createSession: (name: string) => void;
-  loadSession: (sessionId: string) => void;
-  saveCurrentSession: () => void;
-  deleteSession: (sessionId: string) => void;
-  
-  // Conflict resolution
-  getConflicts: () => ConflictResolution[];
-  resolveConflict: (conflict: ConflictResolution) => void;
-  mergeUserLabels: (userIds: string[]) => void;
+  // Computed properties for easy access
+  columnMetadata: ColumnMetadata[];
 }
 
 const defaultUser: User = {
@@ -75,13 +68,22 @@ const autoDetectColumnType = (headerName: string, sampleValues: string[]): Colum
   if (demographicKeywords.some(keyword => header.includes(keyword))) {
     // More specific demographic typing
     if (header.includes('età') || header.includes('age') || header.includes('anno')) {
-      return 'demographic_numeric';
+      return 'demographic_age';
     }
-    if (header.includes('cap') || header.includes('codice') || header.includes('id')) {
-      return 'demographic_code';
+    if (header.includes('sesso') || header.includes('genere') || header.includes('gender')) {
+      return 'demographic_gender';
     }
-    // Default demographic to multiple choice (gender, education, etc.)
-    return 'demographic_multiplechoice';
+    if (header.includes('città') || header.includes('provincia') || header.includes('regione')) {
+      return 'demographic_location';
+    }
+    if (header.includes('istruzione') || header.includes('education') || header.includes('titolo')) {
+      return 'demographic_education';
+    }
+    if (header.includes('lavoro') || header.includes('professione') || header.includes('profession')) {
+      return 'demographic_profession';
+    }
+    // Default demographic
+    return 'demographic_other';
   }
   
   // Question type indicators
@@ -102,25 +104,25 @@ const autoDetectColumnType = (headerName: string, sampleValues: string[]): Colum
         const min = Math.min(...likertValues);
         const max = Math.max(...likertValues);
         if (min === 1 && (max === 5 || max === 7 || max === 10)) {
-          return 'likert';
+          return 'closed_likert';
         }
       }
-      return 'numeric';
+      return 'closed_numeric';
     }
     
     // Check for Likert keywords in header
     if (likertKeywords.some(keyword => header.includes(keyword))) {
-      return 'likert';
+      return 'closed_likert';
     }
     
     // Check for numeric keywords in header
     if (numericKeywords.some(keyword => header.includes(keyword))) {
-      return 'numeric';
+      return 'closed_numeric';
     }
     
     // If few unique values and short text, likely multiple choice
     if (uniqueValues.length <= 10 && avgLength <= 50) {
-      return 'multiplechoice';
+      return 'closed_singlechoice';
     }
     
     // If many unique values or long text, likely open question
@@ -146,6 +148,12 @@ export const useAnalysisStore = create<AnalysisStore>()(
       currentSession: null,
       projects: [],
       currentProject: null,
+
+      // Computed property for columnMetadata
+      get columnMetadata() {
+        const currentProject = get().currentProject;
+        return currentProject?.config?.columnMetadata || [];
+      },
 
       setExcelData: (data) => {
         const { currentUser, saveCurrentProject } = get();
@@ -526,6 +534,32 @@ export const useAnalysisStore = create<AnalysisStore>()(
           const updatedMetadata = currentProject.config.columnMetadata.map(col => 
             col.index === columnIndex 
               ? { ...col, type, autoDetected: false }
+              : col
+          );
+
+          const updatedProject = {
+            ...currentProject,
+            config: {
+              ...currentProject.config,
+              columnMetadata: updatedMetadata,
+            },
+          };
+
+          set((state) => ({
+            projects: state.projects.map(p => 
+              p.id === currentProject.id ? updatedProject : p
+            ),
+            currentProject: updatedProject,
+          }));
+        }
+      },
+
+      updateColumnMetadata: (metadata) => {
+        const { currentProject } = get();
+        if (currentProject) {
+          const updatedMetadata = currentProject.config.columnMetadata.map(col => 
+            col.index === metadata.index 
+              ? { ...col, ...metadata, autoDetected: false }
               : col
           );
 

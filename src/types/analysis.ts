@@ -55,22 +55,48 @@ export interface ColumnStatsFilters {
 
 export type ColumnType = 
   // Livello 1: Categorie principali
-  | 'demographic' 
-  | 'closed' 
-  | 'open'
-  // Livello 2: Sottotipi per domande chiuse
-  | 'likert'
-  | 'numeric' 
-  | 'multiplechoice'
-  // Livello 3: Sottotipi per domande anagrafiche
-  | 'demographic_multiplechoice'
-  | 'demographic_numeric'
-  | 'demographic_code';
+  | 'demographic'     // Anagrafiche
+  | 'non_demographic' // Non anagrafiche
+  
+  // Livello 2: Per non anagrafiche
+  | 'closed'          // Chiuse
+  | 'open'            // Aperte
+  
+  // Livello 3: Sottotipi per domande aperte
+  | 'open_structured'    // Aperte strutturate
+  | 'open_unstructured'  // Aperte non strutturate
+  
+  // Livello 3: Sottotipi per domande chiuse
+  | 'closed_numeric'        // Numeriche
+  | 'closed_likert'         // Likert/scale
+  | 'closed_yesno'          // Sì e No
+  | 'closed_multichoice'    // Scelta multipla
+  | 'closed_singlechoice'   // Scelta singola
+  
+  // Livello 2: Sottotipi per domande anagrafiche
+  | 'demographic_age'       // Età
+  | 'demographic_gender'    // Genere
+  | 'demographic_location'  // Posizione geografica
+  | 'demographic_education' // Livello di istruzione
+  | 'demographic_profession'// Professione
+  | 'demographic_other';    // Altre informazioni anagrafiche
+
+export interface ColumnClassification {
+  level1: 'demographic' | 'non_demographic';
+  level2?: 'closed' | 'open' | 'age' | 'gender' | 'location' | 'education' | 'profession' | 'other';
+  level3?: 'structured' | 'unstructured' | 'numeric' | 'likert' | 'yesno' | 'multichoice' | 'singlechoice';
+  finalType: ColumnType;
+  confidence?: number;
+  autoDetected?: boolean;
+  classifiedAt?: number;
+  classifiedBy?: 'user' | 'ai' | 'auto';
+}
 
 export interface ColumnMetadata {
   index: number;
   name: string;
   type: ColumnType;
+  classification?: ColumnClassification;
   description?: string;
   isRequired?: boolean;
   autoDetected?: boolean;
@@ -88,10 +114,14 @@ export interface ColumnMetadata {
     max?: number;
     unit?: string;
   };
-  codeFormat?: {
-    pattern?: string;
-    prefix?: string;
-    length?: number;
+  yesNoFormat?: {
+    yesValues: string[];
+    noValues: string[];
+  };
+  demographicDetails?: {
+    subtype: string;
+    expectedFormat?: string;
+    validationRules?: string[];
   };
 }
 
