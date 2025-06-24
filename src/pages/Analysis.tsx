@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-react';
+import NavigationHeader from '../components/NavigationHeader';
 import ExcelUploader from '../components/ExcelUploader';
 import LabelManager from '../components/LabelManager';
 import ProjectSettings from '../components/ProjectSettings';
@@ -44,6 +45,7 @@ const Analysis = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-background">
+        <NavigationHeader />
         <div className="container mx-auto p-6">
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold text-foreground mb-2">
@@ -74,6 +76,7 @@ const Analysis = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <NavigationHeader />
       <div className="container mx-auto p-6">
         <div className="mb-8">
           <div className="flex items-center justify-between">

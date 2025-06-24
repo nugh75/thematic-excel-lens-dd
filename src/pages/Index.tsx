@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, Tag, Users, ArrowRight, CheckCircle, Bot } from 'lucide-react';
+import { FileSpreadsheet, Tag, Users, ArrowRight, CheckCircle, Bot, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
@@ -129,6 +129,15 @@ const Index = () => {
             </Button>
             <Button 
               variant="outline" 
+              size="lg"
+              onClick={() => navigate('/instructions')}
+              className="text-lg px-8 py-3"
+            >
+              <BookOpen className="mr-2 h-5 w-5" />
+              Guida Utente
+            </Button>
+            <Button 
+              variant="ghost" 
               size="lg"
               className="text-lg px-8 py-3"
             >
