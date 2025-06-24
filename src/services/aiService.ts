@@ -199,7 +199,7 @@ class AIService {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.settings.openrouterApiKey}`,
             'HTTP-Referer': window.location.origin,
-            'X-Title': 'Thematic Analysis Tool'
+            'X-Title': 'Anatema - AI Analysis Tool'
           },
           body: JSON.stringify({
             model: this.settings.selectedModel,
@@ -297,7 +297,7 @@ class AIService {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.settings.openrouterApiKey}`,
         'HTTP-Referer': window.location.origin,
-        'X-Title': 'Thematic Analysis Tool'
+        'X-Title': 'Anatema - AI Analysis Tool'
       },
       body: JSON.stringify({
         model: this.settings.selectedModel,

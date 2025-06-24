@@ -1,4 +1,4 @@
-# Sistema di Login e Gestione Password - Thematic Excel Lens
+# Sistema di Login e Gestione Password - Anatema
 
 ## 🔐 Panoramica
 
@@ -53,7 +53,7 @@ Il sistema di login è stato completamente rinnovato con un approccio sicuro e u
 #### Utente Amministratore Predefinito
 Al primo avvio, viene creato automaticamente un amministratore:
 - **Username**: Amministratore
-- **Email**: admin@thematic-excel-lens.local
+- **Email**: admin@anatema.local
 - **Password**: Admin123!
 - **Ruolo**: admin
 
@@ -217,4 +217,4 @@ Per domande o problemi:
 
 **Versione**: 1.0.0  
 **Data**: 24 Giugno 2025  
-**Autore**: Sistema AI Thematic Excel Lens
+**Autore**: Sistema AI Anatema

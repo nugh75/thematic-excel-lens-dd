@@ -44,7 +44,7 @@ const colors = [
   const [visibleColumns, setVisibleColumns] = useState<boolean[]>([]);
   const [columnTypeFilter, setColumnTypeFilter] = useState<'all' | 'anagrafica' | 'non_anagrafica' | 'non_classificata'>('all');
   const [columnSubtypeFilter, setColumnSubtypeFilter] = useState<'all' | 'chiusa' | 'aperta'>('all');
-  const [columnCategoryFilter, setColumnCategoryFilter] = useState<string>('');
+  const [columnCategoryFilter, setColumnCategoryFilter] = useState<string>('all');
   const [showClassificationLabels, setShowClassificationLabels] = useState(true);
   
   // States per creazione etichette inline
@@ -108,7 +108,7 @@ const colors = [
       columnsWithClassification,
       columnTypeFilter,
       columnSubtypeFilter,
-      columnCategoryFilter || undefined
+      columnCategoryFilter === 'all' ? undefined : columnCategoryFilter
     );
 
     // Filtra per visibilità
@@ -388,7 +388,7 @@ const colors = [
                           <SelectValue placeholder="Categoria..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Tutte le categorie</SelectItem>
+                          <SelectItem value="all">Tutte le categorie</SelectItem>
                           {availableCategories.map(category => (
                             <SelectItem key={category} value={category}>
                               <div className="flex items-center gap-2">

@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
+import { LoadingIndicator, SkeletonLoader } from './LoadingIndicator';
 import { toast } from '@/hooks/use-toast';
 import { Project } from '../types/analysis';
 
@@ -37,13 +38,16 @@ const ProjectManager = () => {
     addCollaborator,
     removeCollaborator,
     switchProject,
-    saveCurrentProject
+    saveCurrentProject,
+    isServerOnline,
+    isSaving
   } = useAnalysisStore();
   
   const [isCreating, setIsCreating] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
 
-  const handleLoadProject = (projectId: string) => {
+  const handleLoadProject = async (projectId: string) => {
     if (currentProject?.id === projectId) {
       toast({
         title: "Progetto già attivo",
@@ -52,11 +56,22 @@ const ProjectManager = () => {
       return;
     }
 
-    switchProject(projectId);
-    toast({
-      title: "Progetto caricato",
-      description: "Progetto caricato con successo",
-    });
+    setLoadingProjectId(projectId);
+    try {
+      await loadProject(projectId);
+      toast({
+        title: "Progetto caricato",
+        description: "Progetto caricato con successo",
+      });
+    } catch (error) {
+      toast({
+        title: "Errore caricamento",
+        description: "Impossibile caricare il progetto",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingProjectId(null);
+    }
   };
 
   const handleDeleteProject = (projectId: string) => {
@@ -174,14 +189,22 @@ const ProjectManager = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {projects.length === 0 ? (
+          {!isServerOnline ? (
+            <div className="text-center py-8">
+              <div className="text-orange-500 mb-4">
+                <Users className="h-12 w-12 mx-auto" />
+              </div>
+              <p className="text-gray-600">Server non raggiungibile</p>
+              <p className="text-sm text-gray-500">Impossibile caricare i progetti dal server</p>
+            </div>
+          ) : projects.length === 0 ? (
             <div className="text-center py-8">
               <FileSpreadsheet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">Nessun progetto disponibile</p>
               <p className="text-sm text-gray-500">Carica un file Excel per creare il primo progetto</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3">{/* Existing projects rendering */}
               {projects.map((project) => (
                 <div 
                   key={project.id} 
@@ -233,9 +256,14 @@ const ProjectManager = () => {
                         <Button 
                           size="sm" 
                           onClick={() => handleLoadProject(project.id)}
+                          disabled={loadingProjectId === project.id || !isServerOnline}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Carica
+                          {loadingProjectId === project.id ? (
+                            <LoadingIndicator isLoading={true} message="" size="sm" className="mr-1" />
+                          ) : (
+                            <Eye className="h-4 w-4 mr-1" />
+                          )}
+                          {loadingProjectId === project.id ? 'Caricamento...' : 'Carica'}
                         </Button>
                       )}
                       

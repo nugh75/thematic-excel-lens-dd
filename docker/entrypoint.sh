@@ -2,7 +2,7 @@
 
 # Script di entrypoint per gestire le variabili d'ambiente runtime
 
-echo "🚀 Avvio Thematic Excel Lens..."
+echo "🚀 Avvio Anatema..."
 
 # Crea directory per i dati se non esiste
 mkdir -p /app/data
@@ -13,13 +13,13 @@ if [ -f "/usr/share/nginx/html/index.html" ]; then
     echo "📝 Configurazione variabili d'ambiente..."
     
     # Sostituisci le variabili d'ambiente nell'HTML
-    sed -i "s|__VITE_APP_NAME__|${VITE_APP_NAME:-Thematic Excel Lens}|g" /usr/share/nginx/html/index.html
+    sed -i "s|__VITE_APP_NAME__|${VITE_APP_NAME:-Anatema}|g" /usr/share/nginx/html/index.html
     sed -i "s|__VITE_API_URL__|${VITE_API_URL:-}|g" /usr/share/nginx/html/index.html
     
     # Crea un file di configurazione JavaScript runtime
     cat > /usr/share/nginx/html/config.js << EOF
 window.__APP_CONFIG__ = {
-    APP_NAME: "${VITE_APP_NAME:-Thematic Excel Lens}",
+    APP_NAME: "${VITE_APP_NAME:-Anatema}",
     API_URL: "${VITE_API_URL:-}",
     MAX_FILE_SIZE: "${VITE_MAX_FILE_SIZE:-50MB}",
     ALLOWED_FILE_TYPES: "${VITE_ALLOWED_FILE_TYPES:-xlsx,xls,csv}",
@@ -47,7 +47,7 @@ chmod -R 755 /usr/share/nginx/html
 
 # Log delle variabili d'ambiente (senza password/chiavi)
 echo "🔧 Configurazione attiva:"
-echo "  - APP_NAME: ${VITE_APP_NAME:-Thematic Excel Lens}"
+echo "  - APP_NAME: ${VITE_APP_NAME:-Anatema}"
 echo "  - API_URL: ${VITE_API_URL:-Non configurato}"
 echo "  - MAX_FILE_SIZE: ${VITE_MAX_FILE_SIZE:-50MB}"
 echo "  - ENABLE_ANALYTICS: ${VITE_ENABLE_ANALYTICS:-true}"

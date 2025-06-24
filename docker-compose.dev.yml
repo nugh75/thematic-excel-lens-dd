@@ -6,11 +6,11 @@ services:
       - VITE_PORT=8088
       - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
       - VITE_APP_NAME=${VITE_APP_NAME:-AnaTema (Dev)} in modalità sviluppo
-  thematic-excel-lens-dev:
+  anatema-dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: thematic-excel-lens-dev
+    container_name: anatema-dev
     ports:
       - "8088:8088"
     env_file:
@@ -44,7 +44,7 @@ services:
   # Redis per sviluppo
   redis-dev:
     image: redis:7-alpine
-    container_name: thematic-excel-lens-redis-dev
+    container_name: anatema-redis-dev
     ports:
       - "6380:6379"
     volumes:

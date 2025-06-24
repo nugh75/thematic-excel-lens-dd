@@ -10,7 +10,7 @@ export class AuthService {
    */
   static async hashPassword(password: string): Promise<string> {
     const encoder = new TextEncoder();
-    const data = encoder.encode(password + 'salt_thematic_excel_lens');
+    const data = encoder.encode(password + 'salt_anatema');
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -102,7 +102,7 @@ export class AuthService {
     return {
       id: 'admin_' + Date.now(),
       name: 'Amministratore',
-      email: 'admin@thematic-excel-lens.local',
+      email: 'admin@anatema.ai',
       color: '#DC2626',
       role: 'admin',
       isActive: true,

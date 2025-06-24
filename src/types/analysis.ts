@@ -199,52 +199,29 @@ export interface ProjectConfig {
   configuredBy?: string;
 }
 
-export interface Label {
+export interface Project {
   id: string;
   name: string;
-  color: string;
-  description?: string;
-  parentId?: string;
-  children?: Label[];
-  count?: number;
-  tags?: string[];
-}
-
-export interface CellLabel {
-  cellId: string;
-  rowIndex: number;
-  colIndex: number;
-  labelIds: string[];
-  userId?: string;
-  timestamp?: number;
-}
-
-export interface RowLabel {
-  rowIndex: number;
-  labelIds: string[];
-  userId?: string;
-  timestamp?: number;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  color: string;
-  isActive: boolean;
-  email?: string;
-  role?: 'admin' | 'annotator' | 'viewer';
-  createdAt?: number;
-  passwordHash?: string;
-}
-
-export interface LabelingSession {
-  id: string;
-  name: string;
-  createdAt: number;
-  createdBy: string;
+  description: string;
+  excelData: ExcelData;
+  config: ProjectConfig;
+  labels: Label[];
   cellLabels: CellLabel[];
   rowLabels: RowLabel[];
-  labels: Label[];
+  createdAt: number;
+  createdBy: string;
+  lastModified: number;
+  isActive: boolean;
+  collaborators: string[];
+}
+
+// Tipo per le liste di progetti, più leggero di Project
+export interface ProjectListItem {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: number;
+  lastModified: number;
 }
 
 export interface ThematicAnalysis {
@@ -256,7 +233,7 @@ export interface ThematicAnalysis {
   currentUser: User | null;
   sessions: LabelingSession[];
   currentSession: LabelingSession | null;
-  projects: Project[];
+  projects: ProjectListItem[];
   currentProject: Project | null;
 }
 
@@ -270,26 +247,61 @@ export interface AnalysisStats {
 }
 
 export interface ConflictResolution {
-  cellId?: string;
-  rowIndex?: number;
-  conflictingLabels: { userId: string; labelIds: string[] }[];
-  resolvedLabelIds: string[];
+  cellId: string;
+  conflictingLabelIds: string[];
+  chosenLabelId: string;
   resolvedBy: string;
   resolvedAt: number;
+  reason?: string;
 }
 
-export interface Project {
+export interface Label {
   id: string;
   name: string;
-  description?: string;
-  excelData: ExcelData;
-  config: ProjectConfig;
+  description: string;
+  color: string;
+  tags?: TagPredefinito[];
+  rules?: any; // Per regole di auto-etichettatura
   createdAt: number;
   createdBy: string;
-  lastModified: number;
+}
+
+export interface CellLabel {
+  cellId: string; // es. "A1", "B2"
+  labelIds: string[];
+  userId?: string;
+  timestamp?: number;
+  conflict?: {
+    originalLabelId: string;
+    resolvedBy: string;
+    resolvedAt: number;
+  };
+}
+
+export interface RowLabel {
+  rowIndex: number;
+  labelIds: string[];
+  userId?: string;
+  timestamp?: number;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  color: string;
+  role: 'admin' | 'editor' | 'viewer';
   isActive: boolean;
-  collaborators: string[]; // User IDs
-  labels: Label[];
-  cellLabels: CellLabel[];
-  rowLabels: RowLabel[];
+  lastSeen?: number;
+  createdAt: number;
+}
+
+export interface LabelingSession {
+  id: string;
+  userId: string;
+  projectId: string;
+  startTime: number;
+  endTime?: number;
+  actions: any[]; // Log delle azioni per l'analisi del comportamento
 }

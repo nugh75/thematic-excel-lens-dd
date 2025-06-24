@@ -1,11 +1,41 @@
+version: '3.8'
+
 services:
+  # API Server per persistenza dati
+  api-server:
+    build:
+      context: ./api-server
+      dockerfile: Dockerfile
+    container_name: anatema-api
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - API_PORT=3001
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    volumes:
+      - ./api-server:/app
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - anatema_network
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Applicazione principale
-  thematic-excel-lens:
+  anatema:
     build:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: thematic-excel-lens-app
+    container_name: anatema-app
     ports:
       - "${APP_PORT:-3007}:80"
     env_file:
@@ -30,7 +60,9 @@ services:
       - ./logs:/var/log/nginx
     restart: unless-stopped
     networks:
-      - thematic_network
+      - anatema_network
+    depends_on:
+      - api-server
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
@@ -41,7 +73,7 @@ services:
   # Database Redis per cache e sessioni (opzionale)
   redis:
     image: redis:7-alpine
-    container_name: thematic-excel-lens-redis
+    container_name: anatema-redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
     environment:
@@ -51,7 +83,7 @@ services:
       - redis_data:/data
     restart: unless-stopped
     networks:
-      - thematic_network
+      - anatema_network
     command: >
       redis-server
       --appendonly yes
@@ -61,7 +93,7 @@ services:
   # Servizio di backup automatico (opzionale)
   backup:
     image: alpine:latest
-    container_name: thematic-excel-lens-backup
+    container_name: anatema-backup
     environment:
       - BACKUP_INTERVAL=${BACKUP_INTERVAL:-86400} # 24 ore in secondi
       - BACKUP_RETENTION=${BACKUP_RETENTION:-7} # mantieni 7 backup
@@ -70,7 +102,7 @@ services:
       - ./backups:/backups
     restart: unless-stopped
     networks:
-      - thematic_network
+      - anatema_network
     command: >
       sh -c "
         while true; do
@@ -110,7 +142,7 @@ volumes:
 
 # Rete personalizzata
 networks:
-  thematic_network:
+  anatema_network:
     driver: bridge
     ipam:
       driver: default

@@ -88,7 +88,7 @@ const InstructionsPage = () => {
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-3 mb-4">
           <BookOpen className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Guida Utente - Thematic Excel Lens</h1>
+          <h1 className="text-3xl font-bold">Guida Utente - Anatema</h1>
         </div>
         <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
           Una guida completa per utilizzare tutte le funzionalità dell'applicazione di analisi tematica. 
@@ -126,12 +126,12 @@ const InstructionsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-6 w-6 text-primary" />
-                Cos'è Thematic Excel Lens?
+                Cos'è Anatema?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-lg">
-                <strong>Thematic Excel Lens</strong> è un'applicazione avanzata per l'analisi tematica di dati testuali 
+                <strong>Anatema</strong> è un'applicazione avanzata per l'analisi tematica di dati testuali 
                 contenuti in file Excel. Permette di categorizzare, etichettare e analizzare grandi quantità di 
                 risposte testuali utilizzando sia metodi manuali che intelligenza artificiale.
               </p>

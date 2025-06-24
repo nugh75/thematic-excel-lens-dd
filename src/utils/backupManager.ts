@@ -1,7 +1,7 @@
 import { Project } from '../types/analysis';
 
 /**
- * Sistema di backup robusto per Thematic Excel Lens
+ * Sistema di backup robusto per Anatema
  * Supporta backup/ripristino in formato JSON e integrazione con Excel
  */
 
@@ -41,7 +41,7 @@ export const createJSONBackup = (
     project: JSON.parse(JSON.stringify(project)), // Deep clone
     metadata: {
       appVersion: '1.0.0',
-      exportedBy: 'Thematic Excel Lens',
+      exportedBy: 'Anatema',
       description,
       tags
     }
@@ -291,7 +291,7 @@ export const extractBackupFromExcel = (excelData: any): {
         },
         metadata: {
           appVersion: '1.0.0',
-          exportedBy: 'Thematic Excel Lens',
+          exportedBy: 'Anatema',
           description: 'Ripristinato da backup Excel'
         }
       };
@@ -328,7 +328,7 @@ export const extractBackupFromExcel = (excelData: any): {
       },
       metadata: {
         appVersion: '1.0.0',
-        exportedBy: 'Thematic Excel Lens',
+        exportedBy: 'Anatema',
         description: metadata.description
       }
     };

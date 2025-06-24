@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script di gestione per Thematic Excel Lens Docker
+# Script di gestione per Anatema Docker
 
 set -e
 
@@ -151,20 +151,20 @@ rebuild_safe() {
     
     # Arresta solo il container dell'app, preservando Redis e backup
     log_info "🛑 Arresto container applicazione..."
-    docker-compose stop thematic-excel-lens || true
-    docker-compose rm -f thematic-excel-lens || true
+    docker-compose stop anatema || true
+    docker-compose rm -f anatema || true
     
     # Rebuild dell'immagine
     log_info "🔨 Rebuild dell'immagine applicazione..."
-    docker-compose build --no-cache thematic-excel-lens
+    docker-compose build --no-cache anatema
     
     # Riavvio con volumi preservati
     log_info "🚀 Riavvio con dati preservati..."
-    docker-compose up -d thematic-excel-lens
+    docker-compose up -d anatema
     
     # Verifica che tutto sia in esecuzione
     sleep 3
-    if docker-compose ps thematic-excel-lens | grep -q "Up"; then
+    if docker-compose ps anatema | grep -q "Up"; then
         log_success "✅ Rebuild sicuro completato con successo!"
         
         # Verifica preservazione dati
@@ -227,7 +227,7 @@ dev_stop() {
 
 # Visualizza logs
 logs() {
-    local service=${1:-thematic-excel-lens}
+    local service=${1:-anatema}
     log_info "Visualizzazione logs per il servizio: $service"
     docker-compose logs -f "$service"
 }
@@ -314,7 +314,7 @@ status() {
     docker-compose ps
     
     # Mostra l'URL se l'app è in esecuzione
-    if docker-compose ps | grep -q "thematic-excel-lens.*Up"; then
+    if docker-compose ps | grep -q "anatema.*Up"; then
         # Leggi IP e porta dal file di configurazione
         APP_HOST=$(grep "^APP_HOST=" .env.docker 2>/dev/null | cut -d'=' -f2) || APP_HOST="localhost"
         APP_PORT=$(grep "^APP_PORT=" .env.docker 2>/dev/null | cut -d'=' -f2) || APP_PORT="8655"
@@ -339,7 +339,7 @@ update() {
 
 # Help
 show_help() {
-    echo "🐳 Script di gestione Thematic Excel Lens"
+    echo "🐳 Script di gestione Anatema"
     echo ""
     echo "Utilizzo: $0 <comando>"
     echo ""

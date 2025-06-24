@@ -1,6 +1,6 @@
-# 🐳 Docker Setup - Thematic Excel Lens
+# 🐳 Docker Setup - Anatema
 
-Questo progetto include una configurazione Docker completa per la distribuzione e lo sviluppo dell'applicazione Thematic Excel Lens.
+Questo progetto include una configurazione Docker completa per la distribuzione e lo sviluppo dell'applicazione Anatema.
 
 ## 🚀 Quick Start
 
@@ -66,7 +66,7 @@ L'applicazione sarà disponibile su: **http://localhost:3000**
 ### Monitoring e Debug
 ```bash
 ./docker-manage.sh logs                      # Tutti i logs
-./docker-manage.sh logs thematic-excel-lens  # Logs app
+./docker-manage.sh logs anatema  # Logs app
 ./docker-manage.sh logs redis               # Logs Redis
 ```
 
@@ -83,7 +83,7 @@ L'applicazione sarà disponibile su: **http://localhost:3000**
 #### Applicazione
 ```env
 APP_PORT=3000                    # Porta dell'applicazione
-VITE_APP_NAME=Thematic Excel Lens  # Nome dell'app
+VITE_APP_NAME=Anatema  # Nome dell'app
 VITE_MAX_FILE_SIZE=50MB         # Dimensione massima file
 VITE_AUTO_SAVE_INTERVAL=30000   # Auto-save (millisecondi)
 ```
@@ -110,7 +110,7 @@ REDIS_PASSWORD=secure_password  # Password Redis
 
 ### Servizi Inclusi
 
-#### 1. **thematic-excel-lens** (Applicazione Principale)
+#### 1. **anatema** (Applicazione Principale)
 - **Base**: Nginx + App React buildato
 - **Porta**: 3000 (configurabile)
 - **Volumi**: Dati app, logs
@@ -180,10 +180,10 @@ docker-compose logs redis
 ### Debug
 ```bash
 # Accesso al container
-docker exec -it thematic-excel-lens-app sh
+docker exec -it anatema-app sh
 
 # Controllo configurazione
-docker exec thematic-excel-lens-app cat /usr/share/nginx/html/config.js
+docker exec anatema-app cat /usr/share/nginx/html/config.js
 ```
 
 ## 📈 Scaling
@@ -191,7 +191,7 @@ docker exec thematic-excel-lens-app cat /usr/share/nginx/html/config.js
 ### Scaling Orizzontale
 ```bash
 # Scala l'applicazione a 3 istanze
-docker-compose up -d --scale thematic-excel-lens=3
+docker-compose up -d --scale anatema=3
 ```
 
 ### Load Balancer (Opzionale)
@@ -256,7 +256,7 @@ docker-compose config
 docker volume ls
 
 # Verifica mount points
-docker inspect thematic-excel-lens-app
+docker inspect anatema-app
 ```
 
 #### Permessi
@@ -284,4 +284,4 @@ Per problemi o domande:
 
 ---
 
-**🎉 Thematic Excel Lens è ora pronto per la produzione con Docker!**
+**🎉 Anatema è ora pronto per la produzione con Docker!**

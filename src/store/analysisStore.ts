@@ -12,10 +12,18 @@ import {
   Project, 
   ColumnMetadata, 
   ColumnType, 
-  ColumnClassification 
+  ColumnClassification, 
+  ProjectListItem
 } from '../types/analysis';
+import { apiService } from '../services/apiService';
+import { offlineManager } from '../services/offlineManager';
 
-interface AnalysisStore extends ThematicAnalysis {
+// Variabile per il debouncing dell'autosave
+let autoSaveTimeout: NodeJS.Timeout | null = null;
+
+interface AnalysisState extends ThematicAnalysis {
+  projects: ProjectListItem[];
+  currentProject: Project | null;
   setExcelData: (data: ExcelData) => void;
   addLabel: (label: Omit<Label, 'id'>) => void;
   updateLabel: (id: string, updates: Partial<Label>) => void;
@@ -35,14 +43,33 @@ interface AnalysisStore extends ThematicAnalysis {
   updateUser: (userId: string, updates: Partial<User>) => void;
   
   // Project management methods
-  createProject: (name: string, description: string, excelData: ExcelData) => void;
-  loadProject: (projectId: string) => void;
-  saveCurrentProject: () => void;
-  deleteProject: (projectId: string) => void;
-  updateProject: (projectId: string, updates: Partial<Project>) => void;
+  createProject: (name: string, description: string, excelData: ExcelData) => Promise<void>;
+  loadProject: (projectId: string) => Promise<void>;
+  saveCurrentProject: () => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
   addCollaborator: (projectId: string, userId: string) => void;
   removeCollaborator: (projectId: string, userId: string) => void;
-  switchProject: (projectId: string) => void;
+  switchProject: (projectId: string) => Promise<void>;
+  
+  // API Integration methods
+  syncWithServer: () => Promise<void>;
+  getServerProjects: () => Promise<void>;
+  importProjectFromBackup: (backupData: any) => Promise<void>;
+  exportProjectToBackup: (projectId?: string) => Promise<void>;
+  autoSaveProject: () => Promise<boolean>;
+  
+  // Offline management
+  processOfflineQueue: () => Promise<void>;
+  getPendingOperationsCount: () => number;
+  clearOfflineQueue: () => void;
+  
+  // Server status
+  isServerOnline: boolean;
+  setServerOnline: (online: boolean) => void;
+  isSaving: boolean;
+  lastSaved: number | null;
+  error: string | null;
   
   // Column configuration
   configureColumns: (columnMetadata: ColumnMetadata[]) => void;
@@ -164,9 +191,7 @@ const autoDetectColumnType = (headerName: string, sampleValues: string[]): Colum
   return 'open';
 };
 
-
-
-export const useAnalysisStore = create<AnalysisStore>()(
+export const useAnalysisStore = create<AnalysisState>()(
   persist(
     (set, get) => ({
       excelData: null,
@@ -179,69 +204,25 @@ export const useAnalysisStore = create<AnalysisStore>()(
       currentSession: null,
       projects: [],
       currentProject: null,
+      isServerOnline: true,
+      isSaving: false,
+      lastSaved: null,
+      error: null,
+      columnMetadata: [],
 
-      // Computed property for columnMetadata
-      get columnMetadata() {
-        const currentProject = get().currentProject;
-        return currentProject?.config?.columnMetadata || [];
-      },
-
-      setExcelData: (data) => {
-        const { currentUser, saveCurrentProject } = get();
-        
-        // Salva il progetto corrente se esiste
-        saveCurrentProject();
-        
-        // Auto-detect column types
-        const columnMetadata: ColumnMetadata[] = data.headers.map((header, index) => {
-          const sampleValues = data.rows.slice(0, 10).map(row => row[index]).filter(Boolean);
-          const detectedType = autoDetectColumnType(header, sampleValues);
-          
-          return {
-            index,
-            name: header,
-            type: detectedType,
-            autoDetected: true,
-            sampleValues: sampleValues.slice(0, 5),
-          };
+      // setExcelData now simply triggers project creation
+      setExcelData: (data: ExcelData) => {
+        const { saveCurrentProject, createProject } = get();
+        // Prima salva il lavoro corrente, poi crea il nuovo progetto
+        saveCurrentProject().then(() => {
+          createProject(data.fileName, `Progetto creato da ${data.fileName}`, data);
         });
-        
-        // Crea un nuovo progetto per il file caricato
-        const newProject: Project = {
-          id: Date.now().toString(),
-          name: data.fileName,
-          description: `Progetto creato da ${data.fileName}`,
-          excelData: data,
-          config: {
-            columnMetadata,
-            isConfigured: false,
-          },
-          createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
-          lastModified: Date.now(),
-          isActive: true,
-          collaborators: [currentUser?.id || 'unknown'],
-          labels: [],
-          cellLabels: [],
-          rowLabels: [],
-        };
-
-        set((state) => ({
-          projects: [...state.projects, newProject],
-          currentProject: newProject,
-          excelData: data,
-          labels: [],
-          cellLabels: [],
-          rowLabels: [],
-        }));
       },
 
       addLabel: (labelData) => {
-        const id = Date.now().toString();
-        const newLabel: Label = { ...labelData, id };
+        const newLabel: Label = { ...labelData, id: Date.now().toString() };
         set((state) => ({ labels: [...state.labels, newLabel] }));
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       updateLabel: (id, updates) => {
@@ -250,8 +231,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
             label.id === id ? { ...label, ...updates } : label
           ),
         }));
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       deleteLabel: (id) => {
@@ -266,32 +246,26 @@ export const useAnalysisStore = create<AnalysisStore>()(
             labelIds: rowLabel.labelIds.filter((labelId) => labelId !== id),
           })),
         }));
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       mergeLabels: (sourceLabels, targetLabel) => {
         set((state) => {
-          // Verifica che l'etichetta target esista
           const targetExists = state.labels.some(label => label.id === targetLabel);
-          if (!targetExists) return state;
+          if (!targetExists) {
+            return state;
+          }
 
-          // Aggiorna tutti i riferimenti dalle etichette sorgente all'etichetta target
           const updatedCellLabels = state.cellLabels.map(cellLabel => ({
             ...cellLabel,
-            labelIds: cellLabel.labelIds.map(labelId => 
-              sourceLabels.includes(labelId) ? targetLabel : labelId
-            ).filter((labelId, index, arr) => arr.indexOf(labelId) === index) // Rimuovi duplicati
+            labelIds: [...new Set(cellLabel.labelIds.map(id => sourceLabels.includes(id) ? targetLabel : id))]
           }));
 
           const updatedRowLabels = state.rowLabels.map(rowLabel => ({
             ...rowLabel,
-            labelIds: rowLabel.labelIds.map(labelId => 
-              sourceLabels.includes(labelId) ? targetLabel : labelId
-            ).filter((labelId, index, arr) => arr.indexOf(labelId) === index) // Rimuovi duplicati
+            labelIds: [...new Set(rowLabel.labelIds.map(id => sourceLabels.includes(id) ? targetLabel : id))]
           }));
 
-          // Rimuovi le etichette sorgente
           const updatedLabels = state.labels.filter(label => !sourceLabels.includes(label.id));
 
           return {
@@ -300,98 +274,67 @@ export const useAnalysisStore = create<AnalysisStore>()(
             rowLabels: updatedRowLabels,
           };
         });
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       addCellLabel: (cellLabel) => {
         set((state) => {
-          const currentUser = state.currentUser;
-          const labelWithUser = {
-            ...cellLabel,
-            userId: currentUser?.id,
-            timestamp: Date.now(),
-          };
-
-          const existingIndex = state.cellLabels.findIndex(
-            (cl) => cl.cellId === cellLabel.cellId
-          );
-          
+          const existingIndex = state.cellLabels.findIndex(cl => cl.cellId === cellLabel.cellId);
           if (existingIndex >= 0) {
             const updatedCellLabels = [...state.cellLabels];
             updatedCellLabels[existingIndex] = {
               ...updatedCellLabels[existingIndex],
               labelIds: [...new Set([...updatedCellLabels[existingIndex].labelIds, ...cellLabel.labelIds])],
               timestamp: Date.now(),
+              userId: state.currentUser?.id,
             };
             return { cellLabels: updatedCellLabels };
           } else {
-            return { cellLabels: [...state.cellLabels, labelWithUser] };
+            return { cellLabels: [...state.cellLabels, { ...cellLabel, userId: state.currentUser?.id, timestamp: Date.now() }] };
           }
         });
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       removeCellLabel: (cellId, labelId) => {
         set((state) => ({
           cellLabels: state.cellLabels.map((cellLabel) =>
             cellLabel.cellId === cellId
-              ? {
-                  ...cellLabel,
-                  labelIds: cellLabel.labelIds.filter((id) => id !== labelId),
-                  timestamp: Date.now(),
-                }
+              ? { ...cellLabel, labelIds: cellLabel.labelIds.filter((id) => id !== labelId), timestamp: Date.now() }
               : cellLabel
           ).filter((cellLabel) => cellLabel.labelIds.length > 0),
         }));
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       addRowLabel: (rowLabel) => {
         set((state) => {
-          const currentUser = state.currentUser;
-          const labelWithUser = {
-            ...rowLabel,
-            userId: currentUser?.id,
-            timestamp: Date.now(),
-          };
-
-          const existingIndex = state.rowLabels.findIndex(
-            (rl) => rl.rowIndex === rowLabel.rowIndex
-          );
-          
+          const existingIndex = state.rowLabels.findIndex(rl => rl.rowIndex === rowLabel.rowIndex);
           if (existingIndex >= 0) {
             const updatedRowLabels = [...state.rowLabels];
             updatedRowLabels[existingIndex] = {
               ...updatedRowLabels[existingIndex],
               labelIds: [...new Set([...updatedRowLabels[existingIndex].labelIds, ...rowLabel.labelIds])],
               timestamp: Date.now(),
+              userId: state.currentUser?.id,
             };
             return { rowLabels: updatedRowLabels };
           } else {
-            return { rowLabels: [...state.rowLabels, labelWithUser] };
+            return { rowLabels: [...state.rowLabels, { ...rowLabel, userId: state.currentUser?.id, timestamp: Date.now() }] };
           }
         });
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       removeRowLabel: (rowIndex, labelId) => {
         set((state) => ({
           rowLabels: state.rowLabels.map((rowLabel) =>
             rowLabel.rowIndex === rowIndex
-              ? {
-                  ...rowLabel,
-                  labelIds: rowLabel.labelIds.filter((id) => id !== labelId),
-                  timestamp: Date.now(),
-                }
+              ? { ...rowLabel, labelIds: rowLabel.labelIds.filter((id) => id !== labelId), timestamp: Date.now() }
               : rowLabel
           ).filter((rowLabel) => rowLabel.labelIds.length > 0),
         }));
-        // Auto-save al progetto corrente
-        setTimeout(() => get().saveCurrentProject(), 100);
+        get().autoSaveProject();
       },
 
       clearAnalysis: () => set({ 
@@ -401,534 +344,417 @@ export const useAnalysisStore = create<AnalysisStore>()(
         rowLabels: [],
         sessions: [],
         currentSession: null,
+        currentProject: null,
+        columnMetadata: [],
+        isSaving: false,
+        lastSaved: null,
+        error: null,
       }),
 
       // Project management
-      createProject: (name, description, excelData) => {
+      createProject: async (name, description, excelData) => {
         const { currentUser } = get();
-        
-        // Auto-detect column types
         const columnMetadata: ColumnMetadata[] = excelData.headers.map((header, index) => {
-          const sampleValues = excelData.rows.slice(0, 10).map(row => row[index]).filter(Boolean);
-          const detectedType = autoDetectColumnType(header, sampleValues);
-          
-          return {
-            index,
-            name: header,
-            type: detectedType,
-            autoDetected: true,
-            sampleValues: sampleValues.slice(0, 5),
-          };
+            const sampleValues = excelData.rows.slice(0, 10).map(row => row[index]).filter(Boolean);
+            return {
+              index,
+              name: header,
+              type: autoDetectColumnType(header, sampleValues),
+              autoDetected: true,
+              sampleValues: sampleValues.slice(0, 5),
+            };
         });
 
-        const newProject: Project = {
-          id: Date.now().toString(),
-          name,
-          description,
-          excelData,
-          config: {
-            columnMetadata,
-            isConfigured: false,
-          },
-          createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
-          lastModified: Date.now(),
-          isActive: true,
-          collaborators: [currentUser?.id || 'unknown'],
-          labels: [],
-          cellLabels: [],
-          rowLabels: [],
-        };
-
-        set((state) => ({
-          projects: [...state.projects, newProject],
-          currentProject: newProject,
-          excelData,
-          labels: [],
-          cellLabels: [],
-          rowLabels: [],
-        }));
-      },
-
-      loadProject: (projectId) => {
-        const { projects } = get();
-        const project = projects.find(p => p.id === projectId);
-        if (project) {
-          set({
-            currentProject: project,
-            excelData: project.excelData,
-            labels: [...project.labels],
-            cellLabels: [...project.cellLabels],
-            rowLabels: [...project.rowLabels],
-          });
-        }
-      },
-
-      saveCurrentProject: () => {
-        const { currentProject, labels, cellLabels, rowLabels } = get();
-        if (currentProject) {
-          const updatedProject = {
-            ...currentProject,
-            labels: [...labels],
-            cellLabels: [...cellLabels],
-            rowLabels: [...rowLabels],
-            lastModified: Date.now(),
+        try {
+          const newProjectData = {
+            name,
+            description,
+            excelData,
+            config: { columnMetadata, isConfigured: false },
+            createdBy: currentUser?.id || 'unknown',
+          };
+          const { project: newProject } = await apiService.createProject(newProjectData as any);
+          
+          const newProjectListItem: ProjectListItem = {
+            id: newProject.id,
+            name: newProject.name,
+            description: newProject.description,
+            createdAt: newProject.createdAt,
+            lastModified: newProject.lastModified,
           };
 
           set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
+            projects: [...state.projects, newProjectListItem],
+            currentProject: newProject,
+            excelData: newProject.excelData,
+            labels: newProject.labels || [],
+            cellLabels: newProject.cellLabels || [],
+            rowLabels: newProject.rowLabels || [],
+            columnMetadata: newProject.config.columnMetadata || [],
+            isServerOnline: true,
+            lastSaved: newProject.lastModified,
+            error: null,
+          }));
+        } catch (error) {
+          console.error('Errore creazione progetto, fallback locale:', error);
+          const newProject: Project = {
+            id: `local_${Date.now().toString()}`,
+            name,
+            description,
+            excelData,
+            config: { columnMetadata, isConfigured: false },
+            createdAt: Date.now(),
+            createdBy: currentUser?.id || 'unknown',
+            lastModified: Date.now(),
+            isActive: true,
+            collaborators: [currentUser?.id || 'unknown'],
+            labels: [],
+            cellLabels: [],
+            rowLabels: [],
+          };
+          const newProjectListItem: ProjectListItem = {
+            id: newProject.id,
+            name: newProject.name,
+            description: newProject.description,
+            createdAt: newProject.createdAt,
+            lastModified: newProject.lastModified,
+          };
+          set((state) => ({
+            projects: [...state.projects, newProjectListItem],
+            currentProject: newProject,
+            excelData,
+            labels: [],
+            cellLabels: [],
+            rowLabels: [],
+            columnMetadata,
+            isServerOnline: false,
+            error: "Creazione progetto fallita. Lavorando in modalità offline."
           }));
         }
       },
 
-      deleteProject: (projectId) => {
-        set((state) => ({
-          projects: state.projects.filter(p => p.id !== projectId),
-          currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
-          excelData: state.currentProject?.id === projectId ? null : state.excelData,
-        }));
+      loadProject: async (projectId) => {
+        try {
+          const { project } = await apiService.getProject(projectId);
+          set({
+            currentProject: project,
+            excelData: project.excelData || null,
+            labels: project.labels || [],
+            cellLabels: project.cellLabels || [],
+            rowLabels: project.rowLabels || [],
+            columnMetadata: project.config?.columnMetadata || [],
+            isServerOnline: true,
+            lastSaved: project.lastModified,
+            error: null,
+          });
+        } catch (error) {
+          console.error("Failed to load project from server:", error);
+          set({ isServerOnline: false, error: "Caricamento fallito. Server non raggiungibile." });
+          // Fallback to local version if available
+          const localProject = get().projects.find(p => p.id === projectId);
+          if (localProject) {
+            // This is a ProjectListItem, we can't load full data offline if not already present
+            console.warn(`Project ${projectId} not fully available offline.`);
+          }
+        }
       },
 
-      updateProject: (projectId, updates) => {
-        set((state) => {
-          const updatedProjects = state.projects.map(p => 
-            p.id === projectId ? { ...p, ...updates } : p
-          );
-          
-          const updatedCurrentProject = state.currentProject?.id === projectId 
-            ? { ...state.currentProject, ...updates }
-            : state.currentProject;
+      saveCurrentProject: async () => {
+        const { currentProject, labels, cellLabels, rowLabels, columnMetadata, isServerOnline } = get();
+        if (!currentProject || currentProject.id.startsWith('local_')) {
+          return; // Non salvare progetti locali o non esistenti
+        }
 
-          return {
-            projects: updatedProjects,
-            currentProject: updatedCurrentProject,
+        set({ isSaving: true, error: null });
+
+        if (isServerOnline) {
+          try {
+            const projectUpdate = {
+              name: currentProject.name,
+              description: currentProject.description,
+              labels,
+              cellLabels,
+              rowLabels,
+              config: { ...currentProject.config, columnMetadata },
+              lastModified: Date.now(),
+            };
+            const { project: updatedProject } = await apiService.updateProject(currentProject.id, projectUpdate as any);
+            set(state => ({
+              currentProject: updatedProject,
+              isServerOnline: true,
+              isSaving: false,
+              lastSaved: updatedProject.lastModified,
+              error: null,
+              projects: state.projects.map(p =>
+                p.id === updatedProject.id
+                  ? { ...p, name: updatedProject.name, description: updatedProject.description, lastModified: updatedProject.lastModified }
+                  : p
+              ),
+            }));
+          } catch (error) {
+            console.error("Failed to save project to server:", error);
+            set({ isServerOnline: false, isSaving: false, error: "Salvataggio fallito. Controlla la connessione." });
+          }
+        } else {
+          // Server offline - salva in coda per la sincronizzazione
+          console.warn("Server is offline. Queuing project changes for later sync.");
+          
+          // Salva localmente il progetto
+          if (currentProject) {
+            offlineManager.saveProjectLocally(currentProject);
+            offlineManager.queueOperation('update', currentProject.id, currentProject);
+          }
+          
+          set({ 
+            isSaving: false, 
+            error: "Offline: modifiche salvate localmente e in coda per la sincronizzazione." 
+          });
+        }
+      },
+
+      autoSaveProject: () => {
+        if (autoSaveTimeout) {
+          clearTimeout(autoSaveTimeout);
+        }
+        autoSaveTimeout = setTimeout(() => {
+          get().saveCurrentProject();
+        }, 2000); // Debounce di 2 secondi
+        return Promise.resolve(true);
+      },
+
+      deleteProject: async (projectId) => {
+        try {
+          await apiService.deleteProject(projectId);
+          set((state) => ({
+            projects: state.projects.filter((p) => p.id !== projectId),
+            currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
+            isServerOnline: true,
+            error: null,
+          }));
+        } catch (error) {
+          console.error("Failed to delete project on server:", error);
+          set({ isServerOnline: false, error: "Eliminazione fallita." });
+        }
+      },
+      
+      setServerOnline: (online: boolean) => {
+        if (online) {
+            set({ isServerOnline: true, error: null });
+        } else {
+            set({ isServerOnline: false, error: "Connessione persa con il server." });
+        }
+      },
+
+      updateProject: async (projectId, updates) => {
+        try {
+          const { project: updatedProject } = await apiService.updateProject(projectId, updates as any);
+          set(state => {
+            const updatedCurrentProject = state.currentProject?.id === projectId 
+                ? { ...state.currentProject, ...updatedProject } 
+                : state.currentProject;
+
+            return {
+              projects: state.projects.map(p => p.id === projectId ? { ...p, ...updatedProject } : p),
+              currentProject: updatedCurrentProject,
+            };
+          });
+        } catch (error) {
+          console.error("Failed to update project:", error);
+          set({ error: "Aggiornamento progetto fallito." });
+        }
+      },
+
+      getServerProjects: async () => {
+        try {
+          const { projects } = await apiService.getProjects();
+          set({ projects: projects, isServerOnline: true });
+        } catch (error) {
+          console.error("Failed to get projects from server:", error);
+          set({ isServerOnline: false, error: "Impossibile caricare i progetti." });
+        }
+      },
+
+      importProjectFromBackup: async (backupData) => {
+        try {
+          const { project } = await apiService.importProject(backupData);
+          const newListItem: ProjectListItem = { 
+              id: project.id, 
+              name: project.name, 
+              description: project.description, 
+              createdAt: project.createdAt, 
+              lastModified: project.lastModified 
           };
-        });
+          set(state => ({ projects: [...state.projects, newListItem] }));
+        } catch (error) {
+          console.error("Failed to import project:", error);
+          set({ error: "Importazione fallita." });
+        }
+      },
+
+      exportProjectToBackup: async (projectId) => {
+        const idToExport = projectId || get().currentProject?.id;
+        if (!idToExport) return;
+        try {
+          await apiService.exportProject(idToExport);
+        } catch (error) {
+          console.error("Failed to export project:", error);
+          set({ error: "Esportazione fallita." });
+        }
       },
 
       addCollaborator: (projectId, userId) => {
-        set((state) => ({
-          projects: state.projects.map(p => 
-            p.id === projectId 
-              ? { ...p, collaborators: [...new Set([...p.collaborators, userId])] }
-              : p
-          ),
-        }));
+        console.log('addCollaborator not implemented', projectId, userId);
       },
 
       removeCollaborator: (projectId, userId) => {
-        set((state) => ({
-          projects: state.projects.map(p => 
-            p.id === projectId 
-              ? { ...p, collaborators: p.collaborators.filter(id => id !== userId) }
-              : p
-          ),
-        }));
+        console.log('removeCollaborator not implemented', projectId, userId);
       },
 
-      switchProject: (projectId) => {
-        const { loadProject, saveCurrentProject } = get();
-        saveCurrentProject(); // Salva il progetto corrente prima di cambiare
-        loadProject(projectId);
-      },
-
-      // Column configuration
-      configureColumns: (columnMetadata) => {
-        const { currentProject } = get();
-        if (currentProject) {
-          const updatedProject = {
-            ...currentProject,
-            config: {
-              ...currentProject.config,
-              columnMetadata,
-              isConfigured: true,
-              configuredAt: Date.now(),
-              configuredBy: get().currentUser?.id,
-            },
-          };
-
-          set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
-          }));
-        }
-      },
-
-      updateColumnType: (columnIndex, type) => {
-        const { currentProject } = get();
-        if (currentProject) {
-          const updatedMetadata = currentProject.config.columnMetadata.map(col => 
-            col.index === columnIndex 
-              ? { ...col, type, autoDetected: false }
-              : col
-          );
-
-          const updatedProject = {
-            ...currentProject,
-            config: {
-              ...currentProject.config,
-              columnMetadata: updatedMetadata,
-            },
-          };
-
-          set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
-          }));
-        }
-      },
-
-      updateColumnMetadata: (metadata) => {
-        const { currentProject } = get();
-        if (currentProject) {
-          const updatedMetadata = currentProject.config.columnMetadata.map(col => 
-            col.index === metadata.index 
-              ? { ...col, ...metadata, autoDetected: false }
-              : col
-          );
-
-          const updatedProject = {
-            ...currentProject,
-            config: {
-              ...currentProject.config,
-              columnMetadata: updatedMetadata,
-            },
-          };
-
-          set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
-          }));
-        }
-      },
-
-      bulkClassifyColumns: (columnIndexes, classification) => {
-        const { currentProject } = get();
-        if (currentProject) {
-          const updatedMetadata = currentProject.config.columnMetadata.map(col => {
-            if (columnIndexes.includes(col.index)) {
-              const updatedClassification: ColumnClassification = {
-                level1: classification.level1 || col.classification?.level1 || 'non_demographic',
-                level2: classification.level2 || col.classification?.level2,
-                level3: classification.level3 || col.classification?.level3,
-                finalType: classification.finalType || col.type,
-                confidence: classification.confidence || 90,
-                autoDetected: false,
-                classifiedAt: Date.now(),
-                classifiedBy: 'user'
-              };
-
-              return {
-                ...col,
-                type: classification.finalType || col.type,
-                classification: updatedClassification,
-                autoDetected: false
-              };
-            }
-            return col;
-          });
-
-          const updatedProject = {
-            ...currentProject,
-            config: {
-              ...currentProject.config,
-              columnMetadata: updatedMetadata,
-            },
-          };
-
-          set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
-          }));
-        }
-      },
-
-      updateMultipleColumnMetadata: (updates) => {
-        const { currentProject } = get();
-        if (currentProject) {
-          const updatedMetadata = currentProject.config.columnMetadata.map(col => {
-            const update = updates.find(u => u.index === col.index);
-            return update ? { ...col, ...update.metadata, autoDetected: false } : col;
-          });
-
-          const updatedProject = {
-            ...currentProject,
-            config: {
-              ...currentProject.config,
-              columnMetadata: updatedMetadata,
-            },
-          };
-
-          set((state) => ({
-            projects: state.projects.map(p => 
-              p.id === currentProject.id ? updatedProject : p
-            ),
-            currentProject: updatedProject,
-          }));
-        }
-      },
-
-      selectColumnsByPattern: (pattern, caseSensitive = false) => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata
-          .map((col, index) => ({ ...col, index }))
-          .filter(col => {
-            const columnName = col.name;
-            const regex = new RegExp(pattern, caseSensitive ? '' : 'i');
-            return regex.test(columnName);
-          })
-          .map(col => col.index);
-      },
-
-      selectColumnsByType: (type, includeUnclassified = false) => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata
-          .map((col, index) => ({ ...col, index }))
-          .filter(col => includeUnclassified 
-            ? col.type === type || col.autoDetected === true 
-            : col.type === type
-          )
-          .map(col => col.index);
-      },
-
-      selectColumnsByRange: (startIndex, endIndex) => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata
-          .map((col, index) => ({ ...col, index }))
-          .filter(col => col.index >= startIndex && col.index <= endIndex)
-          .map(col => col.index);
-      },
-
-      previewBatchClassification: (columnIndexes, classification) => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata
-          .map((col, index) => ({ ...col, index }))
-          .filter(col => columnIndexes.includes(col.index))
-          .map(col => {
-            const oldType = col.type;
-            const newType = classification.finalType || oldType;
-            const oldClassification = col.classification;
-            
-            const newClassification: ColumnClassification = {
-              level1: classification.level1 || oldClassification?.level1 || 'non_demographic',
-              level2: classification.level2 || oldClassification?.level2,
-              level3: classification.level3 || oldClassification?.level3,
-              finalType: classification.finalType || oldType,
-              confidence: classification.confidence || 90,
-              autoDetected: false,
-              classifiedAt: Date.now(),
-              classifiedBy: 'user'
-            };
-            
-            return {
-              columnIndex: col.index,
-              columnName: col.name,
-              oldType,
-              newType,
-              oldClassification,
-              newClassification,
-            };
-          });
-      },
-      
-      getOpenQuestionColumns: () => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata.filter(col => col.type === 'open');
-      },
-
-      getClosedQuestionColumns: () => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata.filter(col => col.type === 'closed');
-      },
-
-      getDemographicColumns: () => {
-        const { currentProject } = get();
-        if (!currentProject) return [];
-        return currentProject.config.columnMetadata.filter(col => col.type === 'demographic');
+      switchProject: async (projectId) => {
+        await get().loadProject(projectId);
       },
 
       getLabelStats: () => {
-        const { cellLabels, rowLabels } = get();
+        const { cellLabels, rowLabels, labels } = get();
         const stats: { [labelId: string]: number } = {};
-        
-        cellLabels.forEach((cellLabel) => {
-          cellLabel.labelIds.forEach((labelId) => {
-            stats[labelId] = (stats[labelId] || 0) + 1;
-          });
-        });
-
-        rowLabels.forEach((rowLabel) => {
-          rowLabel.labelIds.forEach((labelId) => {
-            stats[labelId] = (stats[labelId] || 0) + 1;
-          });
-        });
-        
+        labels.forEach(l => stats[l.id] = 0);
+        cellLabels.forEach(cl => cl.labelIds.forEach(lId => { if(stats[lId] !== undefined) stats[lId]++; }));
+        rowLabels.forEach(rl => rl.labelIds.forEach(lId => { if(stats[lId] !== undefined) stats[lId]++; }));
         return stats;
       },
 
-      // User management
-      addUser: (userData) => {
-        const id = Date.now().toString();
-        const newUser: User = { ...userData, id };
-        set((state) => ({ users: [...state.users, newUser] }));
-      },
-
-      setCurrentUser: (userId) => {
-        set((state) => ({
-          currentUser: state.users.find(u => u.id === userId) || null,
-        }));
-      },
-
-      removeUser: (userId) => {
-        set((state) => ({
-          users: state.users.filter(u => u.id !== userId),
-          currentUser: state.currentUser?.id === userId ? null : state.currentUser,
-        }));
-      },
-
-      updateUser: (userId, updates) => {
-        set((state) => ({
-          users: state.users.map(u => 
-            u.id === userId ? { ...u, ...updates } : u
-          ),
-          currentUser: state.currentUser?.id === userId 
-            ? { ...state.currentUser, ...updates }
-            : state.currentUser,
-        }));
-      },
-
-      // Session management
-      createSession: (name) => {
-        const { cellLabels, rowLabels, labels, currentUser } = get();
-        const newSession: LabelingSession = {
-          id: Date.now().toString(),
-          name,
-          createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
-          cellLabels: [...cellLabels],
-          rowLabels: [...rowLabels],
-          labels: [...labels],
-        };
-        
-        set((state) => ({
-          sessions: [...state.sessions, newSession],
-          currentSession: newSession,
-        }));
-      },
-
-      loadSession: (sessionId) => {
-        const { sessions } = get();
-        const session = sessions.find(s => s.id === sessionId);
-        if (session) {
-          set({
-            currentSession: session,
-            cellLabels: [...session.cellLabels],
-            rowLabels: [...session.rowLabels],
-            labels: [...session.labels],
-          });
+      addUser: (user) => set(state => ({ users: [...state.users, { ...user, id: `user_${Date.now()}` }]})),
+      setCurrentUser: (userId) => set(state => ({ currentUser: state.users.find(u => u.id === userId) || null })),
+      removeUser: (userId) => set(state => ({ users: state.users.filter(u => u.id !== userId) })),
+      updateUser: (userId, updates) => set(state => ({ 
+          users: state.users.map(u => u.id === userId ? { ...u, ...updates } : u)
+      })),
+      
+      syncWithServer: async () => {
+        await get().getServerProjects();
+        if (get().currentProject) {
+          await get().loadProject(get().currentProject.id);
         }
       },
 
-      saveCurrentSession: () => {
-        const { currentSession, cellLabels, rowLabels, labels } = get();
-        if (currentSession) {
-          const updatedSession = {
-            ...currentSession,
-            cellLabels: [...cellLabels],
-            rowLabels: [...rowLabels],
-            labels: [...labels],
-          };
-          
-          set((state) => ({
-            sessions: state.sessions.map(s => 
-              s.id === currentSession.id ? updatedSession : s
-            ),
-            currentSession: updatedSession,
+      configureColumns: (columnMetadata) => {
+        set({ columnMetadata });
+        get().autoSaveProject();
+      },
+
+      updateColumnType: (columnIndex, type) => {
+        set(state => ({
+          columnMetadata: state.columnMetadata.map(c => 
+            c.index === columnIndex ? { ...c, type, autoDetected: false } : c
+          )
+        }));
+        get().autoSaveProject();
+      },
+
+      updateColumnMetadata: (metadata) => {
+        set(state => ({
+          columnMetadata: state.columnMetadata.map(c => 
+            c.index === metadata.index ? metadata : c
+          )
+        }));
+        get().autoSaveProject();
+      },
+
+      bulkClassifyColumns: (columnIndexes, classification) => {
+        set(state => ({
+          columnMetadata: state.columnMetadata.map(c =>
+            columnIndexes.includes(c.index)
+              ? { ...c, classification: { ...c.classification, ...classification, confidence: 1, aiGenerated: false, classifiedBy: 'user' } as ColumnClassification }
+              : c
+          )
+        }));
+        get().autoSaveProject();
+      },
+
+      updateMultipleColumnMetadata: (updates) => {
+        set(state => ({
+          columnMetadata: state.columnMetadata.map(meta => {
+            const update = updates.find(u => u.index === meta.index);
+            return update ? { ...meta, ...update.metadata } : meta;
+          })
+        }));
+        get().autoSaveProject();
+      },
+
+      selectColumnsByPattern: (pattern, caseSensitive = false) => {
+        const { columnMetadata } = get();
+        const regex = new RegExp(pattern, caseSensitive ? '' : 'i');
+        return columnMetadata
+          .filter(meta => regex.test(meta.name))
+          .map(meta => meta.index);
+      },
+
+      selectColumnsByType: (type, includeUnclassified = false) => {
+        const { columnMetadata } = get();
+        return columnMetadata
+          .filter(meta => meta.type === type)
+          .map(meta => meta.index);
+      },
+
+      selectColumnsByRange: (startIndex, endIndex) => {
+        const { columnMetadata } = get();
+        return columnMetadata
+          .filter(meta => meta.index >= startIndex && meta.index <= endIndex)
+          .map(meta => meta.index);
+      },
+
+      previewBatchClassification: (columnIndexes, classification) => {
+        const { columnMetadata } = get();
+        return columnMetadata
+          .filter(meta => columnIndexes.includes(meta.index))
+          .map(meta => ({
+            columnIndex: meta.index,
+            columnName: meta.name,
+            oldType: meta.type,
+            newType: meta.type, // Placeholder, logic needs to be defined
+            oldClassification: meta.classification,
+            newClassification: { ...meta.classification, ...classification } as ColumnClassification,
           }));
+      },
+
+      getOpenQuestionColumns: () => get().columnMetadata.filter(c => c.type === 'open'),
+      getClosedQuestionColumns: () => get().columnMetadata.filter(c => c.type.startsWith('closed')),
+      getDemographicColumns: () => get().columnMetadata.filter(c => c.type.startsWith('demographic')),
+
+      // Offline management methods
+      processOfflineQueue: async () => {
+        const { isServerOnline } = get();
+        if (!isServerOnline) {
+          console.log("Server offline, cannot process queue");
+          return;
+        }
+
+        try {
+          await offlineManager.processQueue(apiService);
+          console.log("Offline queue processed successfully");
+          
+          // Refresh projects after processing queue
+          const { getServerProjects } = get();
+          await getServerProjects();
+        } catch (error) {
+          console.error("Error processing offline queue:", error);
+          set({ error: "Errore nella sincronizzazione delle modifiche offline" });
         }
       },
 
-      deleteSession: (sessionId) => {
-        set((state) => ({
-          sessions: state.sessions.filter(s => s.id !== sessionId),
-          currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
-        }));
+      getPendingOperationsCount: () => {
+        return offlineManager.getPendingOperationsCount();
       },
 
-      // Conflict resolution
-      getConflicts: () => {
-        const { cellLabels, rowLabels, users } = get();
-        const conflicts: ConflictResolution[] = [];
-        
-        // Check for conflicting cell labels
-        const cellConflicts = new Map<string, CellLabel[]>();
-        cellLabels.forEach(cl => {
-          if (!cellConflicts.has(cl.cellId)) {
-            cellConflicts.set(cl.cellId, []);
-          }
-          cellConflicts.get(cl.cellId)!.push(cl);
-        });
-        
-        cellConflicts.forEach((labels, cellId) => {
-          const userGroups = new Map<string, string[]>();
-          labels.forEach(label => {
-            if (label.userId) {
-              userGroups.set(label.userId, label.labelIds);
-            }
-          });
-          
-          if (userGroups.size > 1) {
-            const conflictingLabels = Array.from(userGroups.entries()).map(([userId, labelIds]) => ({
-              userId,
-              labelIds,
-            }));
-            
-            conflicts.push({
-              cellId,
-              conflictingLabels,
-              resolvedLabelIds: [],
-              resolvedBy: '',
-              resolvedAt: 0,
-            });
-          }
-        });
-        
-        return conflicts;
+      clearOfflineQueue: () => {
+        offlineManager.clearQueue();
+        console.log("Offline queue cleared");
       },
 
-      resolveConflict: (conflict) => {
-        console.log('Resolving conflict:', conflict);
-      },
-
-      mergeUserLabels: (userIds) => {
-        console.log('Merging labels from users:', userIds);
-      },
     }),
     {
       name: 'thematic-analysis-storage',
-      partialize: (state) => ({
-        ...state,
-        // Assicuriamoci che i dati critici vengano sempre salvati
-        currentUser: state.currentUser || defaultUser,
-        users: state.users.length > 0 ? state.users : [defaultUser],
-      }),
+      // getStorage: () => localStorage, // o sessionStorage, o indexedDB
     }
   )
 );

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-react';
@@ -25,6 +25,7 @@ import SingleColumnView from '../components/SingleColumnView';
 import SingleRowView from '../components/SingleRowView';
 import ProjectManager from '../components/ProjectManager';
 import ColumnConfiguration from '../components/ColumnConfiguration';
+import { LoadingIndicator, DataGridSkeleton } from '../components/LoadingIndicator';
 import { useAnalysisStore } from '../store/analysisStore';
 
 const Analysis = () => {
@@ -33,13 +34,45 @@ const Analysis = () => {
     currentUser, 
     currentProject, 
     labels,
-    users
+    users,
+    isServerOnline,
+    isSaving,
+    projects,
+    getServerProjects
   } = useAnalysisStore();
   const [dataView, setDataView] = useState<'grid' | 'column' | 'row'>('grid');
   const [showAdvancedUserManager, setShowAdvancedUserManager] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const currentUserData = users.find(u => u.id === currentUser?.id);
   const isAdmin = currentUserData?.role === 'admin';
+
+  // Carica i progetti all'avvio
+  useEffect(() => {
+    const loadInitialData = async () => {
+      await getServerProjects();
+      setInitialLoading(false);
+    };
+    loadInitialData();
+  }, [getServerProjects]);
+
+  // Show loading screen during initial load
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <NavigationHeader />
+        <div className="container mx-auto p-6">
+          <LoadingIndicator 
+            isLoading={true} 
+            message="Caricamento progetti..." 
+            size="lg"
+            overlay={false}
+            className="py-20"
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Show login screen if no user is logged in
   if (!currentUser) {
@@ -64,6 +97,23 @@ const Analysis = () => {
   }
 
   const renderDataView = () => {
+    // Se stiamo caricando un progetto, mostra il skeleton
+    if (isSaving && !excelData) {
+      return <DataGridSkeleton className="mt-6" />;
+    }
+
+    // Se non ci sono dati excel, mostra un messaggio
+    if (!excelData) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-500 text-lg">
+            Nessun progetto caricato. Seleziona un progetto esistente o caricane uno nuovo.
+          </p>
+        </div>
+      );
+    }
+
+    // Renderizza la vista appropriata
     switch (dataView) {
       case 'column':
         return <SingleColumnView />;
