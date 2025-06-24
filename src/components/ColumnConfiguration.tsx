@@ -10,6 +10,7 @@ import {
 import { useAnalysisStore } from '../store/analysisStore';
 import { ColumnClassification, ColumnMetadata, ColumnType } from '../types/analysis';
 import { ClassificationSelector } from './ClassificationSelector';
+import { formatClassificationLabelFull } from '../utils/classificationDisplay';
 
 /**
  * Componente principale per la configurazione e classificazione delle colonne
@@ -153,17 +154,6 @@ export default function ColumnConfiguration() {
     );
   };
 
-  const getDisplayText = (classification: ColumnClassification): string => {
-    let text = classification.type.replace('_', ' ').charAt(0).toUpperCase() + classification.type.slice(1);
-    if (classification.subtype) {
-      text += ` > ${classification.subtype.charAt(0).toUpperCase() + classification.subtype.slice(1)}`;
-    }
-    if (classification.category) {
-      text += ` > ${classification.category.replace('_', ' ')}`;
-    }
-    return text;
-  };
-
   if (!hasData) {
     return (
       <div className="text-center py-12">
@@ -238,7 +228,7 @@ export default function ColumnConfiguration() {
                       variant={column.classification?.type === 'non_classificata' ? "secondary" : "default"}
                       className="text-xs"
                     >
-                      {column.classification ? getDisplayText(column.classification) : 'Non classificata'}
+                      {column.classification ? formatClassificationLabelFull(column.classification) : 'Non classificata'}
                     </Badge>
                   </div>
                 </div>

@@ -9,13 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Grid, Tag, RowsIcon, Filter, User, BarChart3, MessageSquare, Plus } from 'lucide-react';
+import { Grid, Tag, RowsIcon, Filter, User, BarChart3, MessageSquare, Plus, Eye, EyeOff } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
-import { ColumnType } from '../types/analysis';
 import CellNavigator from './CellNavigator';
 import ColumnSelector from './ColumnSelector';
 import { AIQuickAccess } from './AIQuickAccess';
+import { ClassificationBadge } from './ui/ClassificationBadge';
+import { getDetailedClassificationStats, filterColumnsByDetailedClassification } from '../utils/classificationDisplay';
 
 const colors = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -33,10 +34,7 @@ const colors = [
     addRowLabel, 
     removeRowLabel,
     addLabel,
-    currentProject,
-    getOpenQuestionColumns,
-    getClosedQuestionColumns,
-    getDemographicColumns
+    currentProject
   } = useAnalysisStore();
   
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
@@ -44,7 +42,10 @@ const colors = [
   const [isLabelingOpen, setIsLabelingOpen] = useState(false);
   const [labelingType, setLabelingType] = useState<'cell' | 'row'>('cell');
   const [visibleColumns, setVisibleColumns] = useState<boolean[]>([]);
-  const [columnTypeFilter, setColumnTypeFilter] = useState<ColumnType | 'all'>('all');
+  const [columnTypeFilter, setColumnTypeFilter] = useState<'all' | 'anagrafica' | 'non_anagrafica' | 'non_classificata'>('all');
+  const [columnSubtypeFilter, setColumnSubtypeFilter] = useState<'all' | 'chiusa' | 'aperta'>('all');
+  const [columnCategoryFilter, setColumnCategoryFilter] = useState<string>('');
+  const [showClassificationLabels, setShowClassificationLabels] = useState(true);
   
   // States per creazione etichette inline
   const [isCreatingLabel, setIsCreatingLabel] = useState(false);
@@ -86,22 +87,34 @@ const colors = [
     setVisibleColumns(new Array(excelData.headers.length).fill(false));
   };
 
-  // Filtra le colonne visibili e per tipo
+  // Filtra le colonne visibili e per classificazione avanzata
   const getFilteredColumns = () => {
-    if (!currentProject) return excelData.headers.map((_, index) => index);
+    if (!currentProject) {
+      return excelData.headers.map((_, index) => index);
+    }
     
     const columnMetadata = currentProject.config.columnMetadata;
-    return excelData.headers.map((_, index) => index).filter(index => {
-      // Filtra per tipo
-      if (columnTypeFilter !== 'all') {
-        const columnMeta = columnMetadata.find(meta => meta.index === index);
-        if (!columnMeta || columnMeta.type !== columnTypeFilter) {
-          return false;
-        }
-      }
-      // Filtra per visibilità
-      return visibleColumns[index];
+    const columnsWithClassification = excelData.headers.map((header, index) => {
+      const metadata = columnMetadata.find(meta => meta.index === index);
+      return {
+        index,
+        name: header,
+        classification: metadata?.classification
+      };
     });
+
+    // Applica filtri avanzati
+    const filteredByClassification = filterColumnsByDetailedClassification(
+      columnsWithClassification,
+      columnTypeFilter,
+      columnSubtypeFilter,
+      columnCategoryFilter || undefined
+    );
+
+    // Filtra per visibilità
+    return filteredByClassification
+      .filter(col => visibleColumns[col.index])
+      .map(col => col.index);
   };
 
   const getVisibleColumnIndex = (originalIndex: number) => {
@@ -112,36 +125,12 @@ const colors = [
   const filteredColumnIndexes = getFilteredColumns();
   const visibleHeaders = filteredColumnIndexes.map(index => excelData.headers[index]);
 
-  const getColumnType = (columnIndex: number) => {
-    if (!currentProject) return null;
+  const getColumnClassification = (columnIndex: number) => {
+    if (!currentProject) {
+      return null;
+    }
     const columnMeta = currentProject.config.columnMetadata.find(meta => meta.index === columnIndex);
-    return columnMeta?.type || null;
-  };
-
-  const getColumnTypeIcon = (type: ColumnType | null) => {
-    switch (type) {
-      case 'demographic':
-        return <User className="h-3 w-3" />;
-      case 'closed':
-        return <BarChart3 className="h-3 w-3" />;
-      case 'open':
-        return <MessageSquare className="h-3 w-3" />;
-      default:
-        return null;
-    }
-  };
-
-  const getColumnTypeColor = (type: ColumnType | null) => {
-    switch (type) {
-      case 'demographic':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      case 'closed':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'open':
-        return 'bg-green-100 text-green-800 border-green-300';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+    return columnMeta?.classification || null;
   };
 
   const getCellLabels = (rowIndex: number, colIndex: number) => {
@@ -261,6 +250,42 @@ const colors = [
     });
   };
 
+  // Ottieni categorie disponibili per il filtro
+  const getAvailableCategories = () => {
+    if (!currentProject) return [];
+    
+    const columnMetadata = currentProject.config.columnMetadata;
+    const categories = new Set<string>();
+    
+    columnMetadata.forEach(meta => {
+      if (meta.classification?.category) {
+        categories.add(meta.classification.category);
+      }
+    });
+    
+    return Array.from(categories).sort();
+  };
+
+  // Ottieni statistiche dettagliate
+  const getStats = () => {
+    if (!currentProject) return null;
+    
+    const columnMetadata = currentProject.config.columnMetadata;
+    const columnsWithClassification = excelData.headers.map((header, index) => {
+      const metadata = columnMetadata.find(meta => meta.index === index);
+      return {
+        index,
+        name: header,
+        classification: metadata?.classification
+      };
+    });
+    
+    return getDetailedClassificationStats(columnsWithClassification);
+  };
+
+  const availableCategories = getAvailableCategories();
+  const detailedStats = getStats();
+
   const selectedLabels = labelingType === 'cell' && selectedCell 
     ? getCellLabels(selectedCell.row, selectedCell.col)
     : labelingType === 'row' && selectedRow !== null
@@ -286,36 +311,114 @@ const colors = [
             </CardTitle>
             <div className="flex items-center gap-3">
               {currentProject && (
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                  <Select value={columnTypeFilter} onValueChange={(value: ColumnType | 'all') => setColumnTypeFilter(value)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutte le colonne</SelectItem>
-                      <SelectItem value="open">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          Solo aperte
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="closed">
-                        <div className="flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4" />
-                          Solo chiuse
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="demographic">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          Solo anagrafiche
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  {/* Filtro per tipo principale */}
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <Select value={columnTypeFilter} onValueChange={(value: 'all' | 'anagrafica' | 'non_anagrafica' | 'non_classificata') => setColumnTypeFilter(value)}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutte le colonne</SelectItem>
+                        <SelectItem value="anagrafica">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Solo anagrafiche
+                            {detailedStats && <span className="text-xs text-muted-foreground">({detailedStats.anagrafica.total})</span>}
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="non_anagrafica">
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4" />
+                            Solo non anagrafiche
+                            {detailedStats && <span className="text-xs text-muted-foreground">({detailedStats.non_anagrafica.total})</span>}
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="non_classificata">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Solo non classificate
+                            {detailedStats && <span className="text-xs text-muted-foreground">({detailedStats.non_classificata.total})</span>}
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Filtro per sottotipo (solo se non è "tutte" o "non classificate") */}
+                  {columnTypeFilter !== 'all' && columnTypeFilter !== 'non_classificata' && (
+                    <div className="flex items-center gap-2">
+                      <Select value={columnSubtypeFilter} onValueChange={(value: 'all' | 'chiusa' | 'aperta') => setColumnSubtypeFilter(value)}>
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          <SelectItem value="chiusa">
+                            <div className="flex items-center gap-2">
+                              🔒 Chiuse
+                              {detailedStats && columnTypeFilter !== 'all' && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({detailedStats[columnTypeFilter as 'anagrafica' | 'non_anagrafica'].chiusa})
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="aperta">
+                            <div className="flex items-center gap-2">
+                              🔓 Aperte
+                              {detailedStats && columnTypeFilter !== 'all' && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({detailedStats[columnTypeFilter as 'anagrafica' | 'non_anagrafica'].aperta})
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Filtro per categoria */}
+                  {availableCategories.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Select value={columnCategoryFilter} onValueChange={setColumnCategoryFilter}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Categoria..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Tutte le categorie</SelectItem>
+                          {availableCategories.map(category => (
+                            <SelectItem key={category} value={category}>
+                              <div className="flex items-center gap-2">
+                                🏷️ {category.replace('_', ' ')}
+                                {detailedStats && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({(detailedStats.anagrafica.categories[category] || 0) + (detailedStats.non_anagrafica.categories[category] || 0)})
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
               )}
+
+              {/* Toggle per mostrare/nascondere classificazioni */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowClassificationLabels(!showClassificationLabels)}
+                className="flex items-center gap-2"
+              >
+                {showClassificationLabels ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showClassificationLabels ? 'Nascondi' : 'Mostra'} Classificazioni
+              </Button>
+
               <CellNavigator 
                 onNavigateToCell={handleNavigateToCell}
                 onBulkLabel={handleBulkLabel}
@@ -337,15 +440,16 @@ const colors = [
                           {excelData.headers[colIndex] || `Colonna ${colIndex + 1}`}
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          {currentProject && (
-                            <Badge 
-                              className={`text-xs gap-1 ${getColumnTypeColor(getColumnType(colIndex))}`}
-                            >
-                              {getColumnTypeIcon(getColumnType(colIndex))}
-                              {getColumnType(colIndex)}
-                            </Badge>
+                          {/* Mostra classificazione se abilitata e il progetto ha metadati */}
+                          {showClassificationLabels && currentProject && (
+                            <ClassificationBadge 
+                              classification={getColumnClassification(colIndex)}
+                              variant="compact"
+                              className="text-xs"
+                            />
                           )}
-                          {getColumnType(colIndex) === 'open' && (
+                          
+                          {getColumnClassification(colIndex)?.subtype === 'aperta' && (
                             <AIQuickAccess
                               columnName={excelData.headers[colIndex]}
                               responses={excelData.rows.map(row => row[colIndex] || '').filter(v => v && typeof v === 'string' && v.trim())}

@@ -8,10 +8,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ChevronUp, ChevronDown, Columns, Tag, Plus } from 'lucide-react';
+import { ChevronUp, ChevronDown, Columns, Tag, Plus, Filter } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
 import { AISuggestions } from './AISuggestions';
+import { ClassificationBadge } from './ui/ClassificationBadge';
+import { groupColumnsByClassification, filterColumnsByClassification, searchInClassifications } from '../utils/classificationDisplay';
 
 const colors = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -19,11 +21,15 @@ const colors = [
 ];
 
 const SingleColumnView = () => {
-  const { excelData, labels, cellLabels, addCellLabel, removeCellLabel, addLabel } = useAnalysisStore();
+  const { excelData, labels, cellLabels, addCellLabel, removeCellLabel, addLabel, currentProject } = useAnalysisStore();
   const [selectedColumn, setSelectedColumn] = useState<number>(0);
   const [startIndex, setStartIndex] = useState(0);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [isLabelingOpen, setIsLabelingOpen] = useState(false);
+  
+  // Stati per filtri e ricerca
+  const [classificationFilter, setClassificationFilter] = useState<'all' | 'anagrafica' | 'non_anagrafica' | 'non_classificata'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   
   // Stati per creazione etichette inline
   const [isCreatingLabel, setIsCreatingLabel] = useState(false);
@@ -33,7 +39,29 @@ const SingleColumnView = () => {
   
   const itemsPerPage = 20;
 
-  if (!excelData) return null;
+  if (!excelData) {
+    return null;
+  }
+
+  // Ottieni metadati delle colonne con classificazioni
+  const columnMetadata = currentProject?.config?.columnMetadata || [];
+  const columnsWithClassification = excelData.headers.map((header, index) => {
+    const metadata = columnMetadata.find(meta => meta.index === index);
+    return {
+      index,
+      name: header,
+      classification: metadata?.classification
+    };
+  });
+
+  // Filtra e cerca colonne
+  const filteredColumns = searchInClassifications(
+    filterColumnsByClassification(columnsWithClassification, classificationFilter),
+    searchTerm
+  );
+
+  // Raggruppa colonne per classificazione (per il dropdown)
+  const groupedColumns = groupColumnsByClassification(columnsWithClassification);
 
   const columnData = excelData.rows.map((row, index) => ({
     rowIndex: index,
@@ -66,7 +94,9 @@ const SingleColumnView = () => {
   };
 
   const handleLabelToggle = (labelId: string, checked: boolean) => {
-    if (!selectedCell) return;
+    if (!selectedCell) {
+      return;
+    }
     
     const cellId = `${selectedCell.row}-${selectedCell.col}`;
     
@@ -131,6 +161,51 @@ const SingleColumnView = () => {
             </CardTitle>
             
             <div className="flex items-center gap-4">
+              {/* Filtri */}
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select 
+                  value={classificationFilter} 
+                  onValueChange={(value: 'all' | 'anagrafica' | 'non_anagrafica' | 'non_classificata') => setClassificationFilter(value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le classificazioni</SelectItem>
+                    <SelectItem value="anagrafica">
+                      <div className="flex items-center gap-2">
+                        <ClassificationBadge classification={{ type: 'anagrafica', subtype: null, category: null, confidence: 1, aiGenerated: false }} variant="icon-only" showTooltip={false} />
+                        Anagrafiche
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="non_anagrafica">
+                      <div className="flex items-center gap-2">
+                        <ClassificationBadge classification={{ type: 'non_anagrafica', subtype: null, category: null, confidence: 1, aiGenerated: false }} variant="icon-only" showTooltip={false} />
+                        Non anagrafiche
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="non_classificata">
+                      <div className="flex items-center gap-2">
+                        <ClassificationBadge variant="icon-only" showTooltip={false} />
+                        Non classificate
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Ricerca */}
+              <div className="w-48">
+                <Input
+                  placeholder="Cerca colonne..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Selezione colonna */}
               <Select 
                 value={selectedColumn.toString()} 
                 onValueChange={(value) => {
@@ -138,15 +213,81 @@ const SingleColumnView = () => {
                   setStartIndex(0);
                 }}
               >
-                <SelectTrigger className="w-64">
+                <SelectTrigger className="w-80">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  {excelData.headers.map((header, index) => (
-                    <SelectItem key={index} value={index.toString()}>
-                      {header}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-80">
+                  {/* Mostra solo colonne filtrate */}
+                  {filteredColumns.length > 0 ? (
+                    <>
+                      {/* Raggruppa per classificazione se non c'è filtro di ricerca */}
+                      {!searchTerm && classificationFilter === 'all' ? (
+                        <>
+                          {groupedColumns.anagrafica.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted">
+                                👤 Anagrafiche ({groupedColumns.anagrafica.length})
+                              </div>
+                              {groupedColumns.anagrafica.map((col) => (
+                                <SelectItem key={col.index} value={col.index.toString()}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{col.name}</span>
+                                    <ClassificationBadge classification={col.classification} variant="compact" className="ml-2" />
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                          
+                          {groupedColumns.non_anagrafica.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted">
+                                📊 Non anagrafiche ({groupedColumns.non_anagrafica.length})
+                              </div>
+                              {groupedColumns.non_anagrafica.map((col) => (
+                                <SelectItem key={col.index} value={col.index.toString()}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{col.name}</span>
+                                    <ClassificationBadge classification={col.classification} variant="compact" className="ml-2" />
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                          
+                          {groupedColumns.non_classificata.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted">
+                                ❓ Non classificate ({groupedColumns.non_classificata.length})
+                              </div>
+                              {groupedColumns.non_classificata.map((col) => (
+                                <SelectItem key={col.index} value={col.index.toString()}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{col.name}</span>
+                                    <ClassificationBadge classification={col.classification} variant="compact" className="ml-2" />
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        // Lista semplice per ricerche o filtri attivi
+                        filteredColumns.map((col) => (
+                          <SelectItem key={col.index} value={col.index.toString()}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{col.name}</span>
+                              <ClassificationBadge classification={col.classification} variant="compact" className="ml-2" />
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </>
+                  ) : (
+                    <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      Nessuna colonna trovata
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -155,9 +296,20 @@ const SingleColumnView = () => {
 
         <CardContent>
           <div className="space-y-4">
-            {/* Header fisso */}
-            <div className="sticky top-0 bg-background border-b p-3 font-semibold text-lg">
-              {excelData.headers[selectedColumn]}
+            {/* Header fisso con classificazione */}
+            <div className="sticky top-0 bg-background border-b p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-semibold text-lg">{excelData.headers[selectedColumn]}</h2>
+                  <ClassificationBadge 
+                    classification={columnsWithClassification[selectedColumn]?.classification} 
+                    variant="default"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Colonna {selectedColumn + 1} di {excelData.headers.length}
+                </div>
+              </div>
             </div>
 
             {/* Dati della colonna */}
