@@ -68,7 +68,8 @@ export function AISuggestions({ columnName, responses, onLabelCreated }: AISugge
       id: Date.now().toString(),
       name: suggestion.name,
       description: suggestion.description,
-      color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`
+      color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
+      tags: suggestion.tags || []
     };
 
     addLabel(newLabel);
@@ -178,6 +179,21 @@ export function AISuggestions({ columnName, responses, onLabelCreated }: AISugge
                           {suggestion.confidence}% confidenza
                         </Badge>
                       </div>
+                      
+                      {/* Visualizzazione tag */}
+                      {suggestion.tags && suggestion.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {suggestion.tags.map((tag, tagIndex) => (
+                            <Badge 
+                              key={tagIndex} 
+                              variant="outline" 
+                              className="text-xs bg-green-50 border-green-200 text-green-700"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       
                       <div className="bg-gray-50 p-2 rounded max-h-16 overflow-y-auto">
                         <p className="text-sm text-muted-foreground break-words">

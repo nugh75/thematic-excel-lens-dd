@@ -16,11 +16,16 @@ RISPOSTE DA ANALIZZARE:
 ETICHETTE GIÀ ESISTENTI (evita duplicati):
 {{existingLabels}}
 
+TAG DISPONIBILI PER CATEGORIZZAZIONE (scegli 1-3 tag appropriati per ogni etichetta):
+Emozioni, Problemi, Soddisfazione, Demografia, Sentiment, Comportamentali, Tematiche, Urgenza, Qualità, Servizio, Prodotto, Processo, Comunicazione, Esperienza, Feedback, Miglioramenti
+
 ISTRUZIONI CRITICHE:
 1. Rispondi SOLO con JSON valido
 2. Non aggiungere testo prima o dopo il JSON
 3. Non usare markdown o formattazione
-4. Ogni etichetta deve avere name, description, confidence, reasoning
+4. Ogni etichetta deve avere name, description, confidence, reasoning e tags
+5. I tag devono essere scelti dalla lista predefinita sopra
+6. Seleziona 1-3 tag appropriati per ogni etichetta
 
 JSON RICHIESTO:
 {
@@ -29,7 +34,8 @@ JSON RICHIESTO:
       "name": "Nome Etichetta",
       "description": "Descrizione dettagliata",
       "confidence": 85,
-      "reasoning": "Ragionamento specifico"
+      "reasoning": "Ragionamento specifico",
+      "tags": ["Tag1", "Tag2"]
     }
   ],
   "generalAdvice": "Consigli per l'analisi"
@@ -40,9 +46,9 @@ JSON RICHIESTO:
 Rispondi solo con questo JSON:
 {
   "suggestions": [
-    {"name": "Tema 1", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati"},
-    {"name": "Tema 2", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati"},
-    {"name": "Tema 3", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati"}
+    {"name": "Tema 1", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati", "tags": ["Tematiche"]},
+    {"name": "Tema 2", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati", "tags": ["Feedback"]},
+    {"name": "Tema 3", "description": "Descrizione breve", "confidence": 70, "reasoning": "Basato sui dati", "tags": ["Esperienza"]}
   ],
   "generalAdvice": "Rivedi manualmente i temi identificati"
 }`,
@@ -54,7 +60,7 @@ Rispondi solo con questo JSON:
     (data) => Array.isArray(data.suggestions),
     (data) => data.suggestions.length > 0,
     (data) => data.suggestions.every((s: any) => 
-      s.name && s.description && typeof s.confidence === 'number' && s.reasoning
+      s.name && s.description && typeof s.confidence === 'number' && s.reasoning && Array.isArray(s.tags)
     )
   ]
 };
@@ -187,14 +193,11 @@ export function getSystemPrompt(type: keyof CustomSystemPrompts): string {
   // Fallback ai prompt predefiniti
   switch (type) {
     case 'labelGeneration':
-      const labelGenMsg = LABEL_GENERATION_TEMPLATE.systemMessage;
-      return typeof labelGenMsg === 'function' ? labelGenMsg() : labelGenMsg;
+      return LABEL_GENERATION_TEMPLATE.systemMessage;
     case 'labelSuggestion':
-      const labelSugMsg = LABEL_SUGGESTION_TEMPLATE.systemMessage;
-      return typeof labelSugMsg === 'function' ? labelSugMsg() : labelSugMsg;
+      return LABEL_SUGGESTION_TEMPLATE.systemMessage;
     case 'generalAdvice':
-      const adviceMsg = GENERAL_ADVICE_TEMPLATE.systemMessage;
-      return typeof adviceMsg === 'function' ? adviceMsg() : adviceMsg;
+      return GENERAL_ADVICE_TEMPLATE.systemMessage;
     default:
       return 'Sei un assistente AI specializzato in analisi tematica qualitativa.';
   }

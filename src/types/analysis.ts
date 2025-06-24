@@ -4,6 +4,28 @@ export interface ExcelData {
   fileName: string;
 }
 
+// Tag predefiniti per la categorizzazione delle etichette
+export const TAG_PREDEFINITI = [
+  'Emozioni',
+  'Problemi',
+  'Soddisfazione', 
+  'Demografia',
+  'Sentiment',
+  'Comportamentali',
+  'Tematiche',
+  'Urgenza',
+  'Qualità',
+  'Servizio',
+  'Prodotto',
+  'Processo',
+  'Comunicazione',
+  'Esperienza',
+  'Feedback',
+  'Miglioramenti'
+] as const;
+
+export type TagPredefinito = typeof TAG_PREDEFINITI[number];
+
 // Tipi per le statistiche delle etichette per colonna
 export interface LabelDistribution {
   label: string;
@@ -88,6 +110,7 @@ export interface Label {
   parentId?: string;
   children?: Label[];
   count?: number;
+  tags?: string[];
 }
 
 export interface CellLabel {

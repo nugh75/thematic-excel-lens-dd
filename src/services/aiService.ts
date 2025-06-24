@@ -29,6 +29,7 @@ export interface LabelSuggestion {
   description: string;
   confidence: number;
   reasoning: string;
+  tags?: string[];
 }
 
 export interface AISuggestionResponse {

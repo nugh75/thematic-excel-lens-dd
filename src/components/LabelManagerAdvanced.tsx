@@ -10,9 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Merge, Trash2, Tag, Save, X, Search } from 'lucide-react';
+import { Plus, Edit, Merge, Trash2, Tag, Save, X, Search, Filter } from 'lucide-react';
 import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
+import { TAG_PREDEFINITI } from '../types/analysis';
 
 const colors = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -27,30 +28,40 @@ const LabelManagerAdvanced = () => {
   const [selectedLabelsForMerge, setSelectedLabelsForMerge] = useState<string[]>([]);
   const [targetLabelForMerge, setTargetLabelForMerge] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('');
   
   const [newLabel, setNewLabel] = useState({
     name: '',
     description: '',
     color: colors[0],
+    tags: [] as string[],
   });
   
   const [editLabel, setEditLabel] = useState({
     name: '',
     description: '',
     color: colors[0],
+    tags: [] as string[],
   });
 
   const labelStats = getLabelStats();
 
-  // Filtra le etichette in base al termine di ricerca
-  const filteredLabels = labels.filter(label => 
-    label.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (label.description && label.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filtra le etichette in base al termine di ricerca e tag
+  const filteredLabels = labels.filter(label => {
+    const matchesSearch = label.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (label.description && label.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesTag = !selectedTagFilter || selectedTagFilter === "all" || 
+      (label.tags && label.tags.includes(selectedTagFilter));
+    
+    return matchesSearch && matchesTag;
+  });
 
   // Funzione per evidenziare i termini di ricerca
   const highlightSearchTerm = (text: string, term: string) => {
-    if (!term) return text;
+    if (!term) {
+      return text;
+    }
     const regex = new RegExp(`(${term})`, 'gi');
     const parts = text.split(regex);
     return parts.map((part, index) => 
@@ -61,6 +72,23 @@ const LabelManagerAdvanced = () => {
       ) : part
     );
   };
+
+  // Funzioni per gestire i tag
+  const handleTagToggle = (tag: string, isNew: boolean = false) => {
+    const currentTags = isNew ? newLabel.tags : editLabel.tags;
+    const newTags = currentTags.includes(tag)
+      ? currentTags.filter(t => t !== tag)
+      : [...currentTags, tag];
+    
+    if (isNew) {
+      setNewLabel(prev => ({ ...prev, tags: newTags }));
+    } else {
+      setEditLabel(prev => ({ ...prev, tags: newTags }));
+    }
+  };
+
+  // Ottieni tutti i tag unici utilizzati
+  const usedTags = Array.from(new Set(labels.flatMap(label => label.tags || [])));
 
   const handleCreateLabel = () => {
     if (!newLabel.name.trim()) {
@@ -76,9 +104,10 @@ const LabelManagerAdvanced = () => {
       name: newLabel.name.trim(),
       description: newLabel.description.trim(),
       color: newLabel.color,
+      tags: newLabel.tags,
     });
 
-    setNewLabel({ name: '', description: '', color: colors[0] });
+    setNewLabel({ name: '', description: '', color: colors[0], tags: [] });
     setIsCreating(false);
     
     toast({
@@ -94,6 +123,7 @@ const LabelManagerAdvanced = () => {
         name: label.name,
         description: label.description || '',
         color: label.color,
+        tags: label.tags || [],
       });
       setEditingLabel(labelId);
     }
@@ -113,10 +143,11 @@ const LabelManagerAdvanced = () => {
       name: editLabel.name.trim(),
       description: editLabel.description.trim(),
       color: editLabel.color,
+      tags: editLabel.tags,
     });
 
     setEditingLabel(null);
-    setEditLabel({ name: '', description: '', color: colors[0] });
+    setEditLabel({ name: '', description: '', color: colors[0], tags: [] });
     
     toast({
       title: "Successo",
@@ -269,6 +300,42 @@ const LabelManagerAdvanced = () => {
                         />
                       </div>
                       
+                      {/* Sezione Tag */}
+                      <div className="space-y-3">
+                        <Label>Categorie / Tag</Label>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Seleziona le categorie che descrivono meglio questa etichetta:
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {TAG_PREDEFINITI.map(tag => (
+                              <div key={tag} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`new-tag-${tag}`}
+                                  checked={newLabel.tags.includes(tag)}
+                                  onCheckedChange={() => handleTagToggle(tag, true)}
+                                />
+                                <Label 
+                                  htmlFor={`new-tag-${tag}`}
+                                  className="text-sm cursor-pointer"
+                                >
+                                  {tag}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                          {newLabel.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {newLabel.tags.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
                       <div className="flex gap-3 pt-4 border-t">
                         <Button onClick={handleCreateLabel} className="flex-1" size="lg">
                           <Plus className="h-4 w-4 mr-2" />
@@ -374,16 +441,45 @@ const LabelManagerAdvanced = () => {
                 </div>
               </div>
 
-              {/* Barra di ricerca - visibile solo se ci sono più di 5 etichette */}
+              {/* Barra di ricerca e filtri - visibili solo se ci sono più di 5 etichette */}
               {labels.length > 5 && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cerca etichette per nome o descrizione..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cerca etichette per nome o descrizione..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Filtro per tag */}
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Select value={selectedTagFilter || ""} onValueChange={(value) => setSelectedTagFilter(value || "")}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtra per categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem key="all" value="all">Tutte le categorie</SelectItem>
+                        {TAG_PREDEFINITI.map(tag => (
+                          <SelectItem key={tag} value={tag}>
+                            {tag}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedTagFilter && selectedTagFilter !== "all" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedTagFilter('all')}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -429,9 +525,24 @@ const LabelManagerAdvanced = () => {
                         </div>
                         
                         {label.description && (
-                          <p className="text-sm text-muted-foreground leading-relaxed">
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-2">
                             {highlightSearchTerm(label.description, searchTerm)}
                           </p>
+                        )}
+                        
+                        {/* Visualizzazione tag */}
+                        {label.tags && label.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {label.tags.map(tag => (
+                              <Badge 
+                                key={tag} 
+                                variant="outline" 
+                                className="text-xs px-2 py-0.5"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -558,6 +669,42 @@ const LabelManagerAdvanced = () => {
                 placeholder="Descrizione opzionale dell'etichetta (es. quando utilizzarla, criteri di applicazione...)"
                 className="min-h-[80px] resize-none"
               />
+            </div>
+            
+            {/* Sezione Tag */}
+            <div className="space-y-3">
+              <Label>Categorie / Tag</Label>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Seleziona le categorie che descrivono meglio questa etichetta:
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {TAG_PREDEFINITI.map(tag => (
+                    <div key={tag} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`edit-tag-${tag}`}
+                        checked={editLabel.tags.includes(tag)}
+                        onCheckedChange={() => handleTagToggle(tag, false)}
+                      />
+                      <Label 
+                        htmlFor={`edit-tag-${tag}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {tag}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {editLabel.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {editLabel.tags.map(tag => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="flex gap-3 pt-4 border-t">

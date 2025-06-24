@@ -156,7 +156,8 @@ export function AILabelGenerator() {
         id: Date.now().toString() + Math.random(),
         name: suggestion.name,
         description: suggestion.description,
-        color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`
+        color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
+        tags: suggestion.tags || []
       };
       
       addLabel(newLabel);
@@ -355,6 +356,21 @@ export function AILabelGenerator() {
                           {suggestion.confidence}% confidenza
                         </Badge>
                       </div>
+                      
+                      {/* Visualizzazione tag */}
+                      {suggestion.tags && suggestion.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {suggestion.tags.map((tag, tagIndex) => (
+                            <Badge 
+                              key={tagIndex} 
+                              variant="outline" 
+                              className="text-xs bg-green-50 border-green-200 text-green-700"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       
                       <div className="bg-gray-50 p-3 rounded border max-h-20 overflow-y-auto">
                         <p className="text-sm text-muted-foreground break-words whitespace-pre-wrap">
