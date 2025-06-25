@@ -42,9 +42,6 @@
 
 #### 1.2 Test API Manuale
 ```bash
-# Test health check
-curl http://localhost:3001/health
-
 # Test lista progetti
 curl http://localhost:3001/api/projects
 

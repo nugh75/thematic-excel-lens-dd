@@ -43,7 +43,6 @@ Il processo di migrazione è suddiviso nelle seguenti fasi:
 
 È stato creato un server Express (`api-server`) che espone i seguenti endpoint principali:
 
-*   `GET /health`: Health check del server e della connessione a Redis.
 *   `GET /api/projects`: Lista tutti i progetti (solo metadati).
 *   `POST /api/projects`: Crea un nuovo progetto.
 *   `GET /api/projects/:projectId`: Ottiene i dati completi di un singolo progetto.

@@ -21,22 +21,6 @@
          - "3007:3001"  # HOST:CONTAINER
    ```
 
-2. **Health-check affidabile**
-
-   ```yaml
-   healthcheck:
-     test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-     interval: 30s
-     timeout: 3s
-     retries: 3
-   ```
-   Dopo il riavvio, attendere finché lo stato diventa `healthy`:
-
-   ```bash
-   docker compose up -d
-   docker ps --filter "name=anatema-api" --format "table {{.Names}}\t{{.Status}}"
-   ```
-
 ---
 
 ## 2  Verifica delle porte esposte sull’host

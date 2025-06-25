@@ -42,7 +42,7 @@ class ApiServiceNew {
     debugLog(`Making API request to: ${endpoint}`, options);
 
     try {
-      const result = await this.apiRequest<ApiResponse<T>>(endpoint, options);
+      const result = await this.apiRequest(endpoint, options);
       
       if (result.error) {
         debugLog(`API request failed: ${result.error}`);
@@ -66,17 +66,6 @@ class ApiServiceNew {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       debugLog(`API request exception: ${errorMessage}`);
       return { data: null, success: false, error: errorMessage };
-    }
-  }
-
-  // Health check per verificare stato server
-  async healthCheck(): Promise<boolean> {
-    try {
-      const result = await this.makeRequest('/health');
-      return result.success;
-    } catch (error) {
-      debugLog('Health check failed', error);
-      return false;
     }
   }
 

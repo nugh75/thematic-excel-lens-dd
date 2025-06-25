@@ -280,8 +280,8 @@ export class RobustApiService {
    * Determina il tipo di errore dal status HTTP
    */
   private getErrorTypeFromStatus(status: number): ApiErrorType {
-    if (status >= 500) return ApiErrorType.SERVER_ERROR;
-    if (status === 0) return ApiErrorType.NETWORK_ERROR;
+    if (status >= 500) { return ApiErrorType.SERVER_ERROR; }
+    if (status === 0) { return ApiErrorType.NETWORK_ERROR; }
     return ApiErrorType.UNKNOWN_ERROR;
   }
 
@@ -446,22 +446,6 @@ export class RobustApiService {
 
   async delete<T>(endpoint: string, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
-  }
-
-  /**
-   * Health check per verificare lo stato del server
-   */
-  async healthCheck(): Promise<boolean> {
-    try {
-      const result = await this.get('/health', { 
-        timeout: 5000, 
-        retries: 1,
-        enableOfflineQueue: false 
-      });
-      return result.success;
-    } catch (error) {
-      return false;
-    }
   }
 
   /**

@@ -96,7 +96,6 @@ REDIS_PORT=6379
 ### Configurazione AI
 
 AnaTema supporta diversi provider AI:
-- **OpenAI GPT**: Per analisi avanzate e suggerimenti
 - **OpenRouter**: Accesso a modelli multipli
 - **Modelli locali**: Supporto futuro per deployment privati
 
@@ -133,7 +132,7 @@ Le chiavi API vengono configurate direttamente nell'interfaccia utente per garan
 - **Bundler**: Vite
 - **Database**: Redis (per sessioni e cache)
 - **Containerization**: Docker, Docker Compose
-- **AI Integration**: OpenAI, OpenRouter
+- **AI Integration**: OpenRouter
 
 ## 📁 Struttura del Progetto
 

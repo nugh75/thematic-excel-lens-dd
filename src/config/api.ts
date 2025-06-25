@@ -91,7 +91,7 @@ export const testUrlReachability = async (url: string, timeout = 5000): Promise<
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const response = await fetch(`${url}/health`, {
+    const response = await fetch(url, {
       method: 'GET',
       signal: controller.signal,
       mode: 'cors',

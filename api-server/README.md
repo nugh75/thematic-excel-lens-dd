@@ -34,20 +34,6 @@ npm start
 
 ## Endpoints API
 
-### Health Check
-
-#### `GET /health`
-Verifica lo stato del server e della connessione Redis.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-06-24T12:00:00Z",
-  "redis": "connected"
-}
-```
-
 ### Gestione Progetti
 
 #### `GET /api/projects`
@@ -363,11 +349,6 @@ Per debugging, impostare `NODE_ENV=development` per logs più dettagliati.
 - Usare `jq` per validare il formato: `cat backup.json | jq .`
 
 ## Monitoraggio
-
-### Health Check
-```bash
-curl http://localhost:3001/health
-```
 
 ### Statistiche
 ```bash

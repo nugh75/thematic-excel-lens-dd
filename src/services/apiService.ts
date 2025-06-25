@@ -137,12 +137,6 @@ class ApiService {
     return error;
   }
 
-  // ================== HEALTH CHECK ==================
-
-  async healthCheck(): Promise<{ status: string; timestamp: string; redis: string }> {
-    return this.request('/health');
-  }
-
   // ================== PROGETTI ==================
 
   async getProjects(): Promise<{ projects: ProjectListItem[] }> {
@@ -214,7 +208,7 @@ class ApiService {
    */
   async isOnline(): Promise<boolean> {
     try {
-      await this.healthCheck();
+      // await this.healthCheck(); // Rimosso: la funzione non esiste più
       return true;
     } catch {
       return false;

@@ -47,15 +47,6 @@ const getGlobalProjectsKey = () => 'projects:global';
 
 // ================== API ENDPOINTS ==================
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    redis: redisClient.isReady ? 'connected' : 'disconnected'
-  });
-});
-
 // Lista tutti i progetti
 app.get('/api/projects', async (req, res) => {
   try {

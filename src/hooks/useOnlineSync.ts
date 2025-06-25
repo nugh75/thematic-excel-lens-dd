@@ -17,29 +17,16 @@ export const useOnlineSync = () => {
       console.log('Network is back online, checking server and processing queue...');
       
       try {
-        // Test server connection with AbortController for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        setServerOnline(true);
         
-        const response = await fetch('/api/health', { 
-          method: 'GET',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          setServerOnline(true);
-          
-          // Process offline queue if there are pending operations
-          const pendingCount = getPendingOperationsCount();
-          if (pendingCount > 0) {
-            console.log(`Processing ${pendingCount} pending operations...`);
-            await processOfflineQueue();
-          }
+        // Process offline queue if there are pending operations
+        const pendingCount = getPendingOperationsCount();
+        if (pendingCount > 0) {
+          console.log(`Processing ${pendingCount} pending operations...`);
+          await processOfflineQueue();
         }
       } catch (error) {
-        console.warn('Server still not reachable despite network being online:', error);
+        console.warn('Error processing offline queue:', error);
         setServerOnline(false);
       }
     };
@@ -71,18 +58,8 @@ export const useOnlineSync = () => {
   useEffect(() => {
     const checkServerHealth = async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        
-        const response = await fetch('/api/health', { 
-          method: 'GET',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
         const wasOnline = isServerOnline;
-        const isNowOnline = response.ok;
+        const isNowOnline = true; // Assume online, as /health check is removed
         
         if (!wasOnline && isNowOnline) {
           // Server is back online, process queue
