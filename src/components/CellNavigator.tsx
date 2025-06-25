@@ -37,7 +37,7 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
   const [newLabelDescription, setNewLabelDescription] = useState('');
   const [newLabelColor, setNewLabelColor] = useState('#3B82F6');
 
-  if (!excelData) return null;
+  if (!excelData || !excelData.headers) return null;
 
   const handleSearch = () => {
     if (keyColumn === null || !searchKey.trim()) {
@@ -204,11 +204,11 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
                       <SelectValue placeholder="Seleziona una colonna..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {excelData.headers.map((header, index) => (
+                      {excelData?.headers?.map((header, index) => (
                         <SelectItem key={index} value={index.toString()}>
                           {header || `Colonna ${index + 1}`}
                         </SelectItem>
-                      ))}
+                      )) || []}
                     </SelectContent>
                   </Select>
                 </div>
@@ -266,15 +266,15 @@ const CellNavigator = ({ onNavigateToCell, onBulkLabel }: CellNavigatorProps) =>
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="p-2 border text-left">#</th>
-                        {excelData.headers.map((header, colIndex) => (
+                        {excelData?.headers?.map((header, colIndex) => (
                           <th key={colIndex} className="p-2 border text-left min-w-20">
                             {header || `Col ${colIndex + 1}`}
                           </th>
-                        ))}
+                        )) || []}
                       </tr>
                     </thead>
                     <tbody>
-                      {excelData.rows.slice(0, 20).map((row, rowIndex) => (
+                      {excelData?.rows?.slice(0, 20).map((row, rowIndex) => (
                         <tr 
                           key={rowIndex} 
                           className={`${isRowInFoundResults(rowIndex) ? 'bg-primary/10' : ''}`}

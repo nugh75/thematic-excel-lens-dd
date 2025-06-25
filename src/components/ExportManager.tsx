@@ -87,7 +87,7 @@ const ExportManager = () => {
     const wb = XLSX.utils.book_new();
     
     // Foglio dati originali
-    const originalData = [excelData.headers, ...excelData.rows];
+    const originalData = [excelData?.headers || [], ...(excelData?.rows || [])];
     const ws1 = XLSX.utils.aoa_to_sheet(originalData);
     XLSX.utils.book_append_sheet(wb, ws1, 'Dati Originali');
     
@@ -96,7 +96,7 @@ const ExportManager = () => {
       ['Riga', 'Colonna', 'Valore', 'Etichette', 'Utente', 'Timestamp'],
       ...cellLabels.map(cl => {
         const [rowIndex, colIndex] = cl.cellId.split('-').map(Number);
-        const cellValue = excelData.rows[rowIndex]?.[colIndex] || '';
+        const cellValue = excelData?.rows?.[rowIndex]?.[colIndex] || '';
         const labelNames = cl.labelIds.map(id => labels.find(l => l.id === id)?.name || 'N/A').join(', ');
         return [
           rowIndex + 1,
@@ -682,7 +682,7 @@ const ExportManager = () => {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">Progetto Attivo</p>
                       <p className="text-sm text-muted-foreground">
-                        {currentProject.name} - {excelData ? `${excelData.rows.length} righe, ${excelData.headers.length} colonne` : 'Nessun dato'}
+                        {currentProject.name} - {excelData ? `${excelData?.rows?.length || 0} righe, ${excelData?.headers?.length || 0} colonne` : 'Nessun dato'}
                       </p>
                       <div className="flex gap-2 mt-2">
                         <Badge variant="outline" className="text-xs">

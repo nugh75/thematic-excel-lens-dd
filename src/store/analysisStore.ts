@@ -436,6 +436,12 @@ export const useAnalysisStore = create<AnalysisState>()(
       loadProject: async (projectId) => {
         try {
           const { project } = await apiService.getProject(projectId);
+          
+          // Validazione robusta dei dati del progetto
+          if (!project) {
+            throw new Error('Progetto non trovato');
+          }
+          
           set({
             currentProject: project,
             excelData: project.excelData || null,
@@ -449,7 +455,16 @@ export const useAnalysisStore = create<AnalysisState>()(
           });
         } catch (error) {
           console.error("Failed to load project from server:", error);
-          set({ isServerOnline: false, error: "Caricamento fallito. Server non raggiungibile." });
+          set({ 
+            isServerOnline: false, 
+            error: "Caricamento fallito. Server non raggiungibile.",
+            currentProject: null,
+            excelData: null,
+            labels: [],
+            cellLabels: [],
+            rowLabels: [],
+            columnMetadata: []
+          });
           // Fallback to local version if available
           const localProject = get().projects.find(p => p.id === projectId);
           if (localProject) {

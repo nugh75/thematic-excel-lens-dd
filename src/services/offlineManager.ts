@@ -1,4 +1,5 @@
 import { Project } from '../types/analysis';
+import { StorageQuotaManager } from '../utils/storageQuotaManager';
 
 interface PendingOperation {
   id: string;
@@ -31,12 +32,13 @@ class OfflineManager {
 
   /**
    * Salva un'operazione in coda per quando si tornerà online
+   * Con gestione intelligente della quota storage
    */
-  public queueOperation(
+  public async queueOperation(
     type: PendingOperation['type'],
     projectId: string,
     data?: Partial<Project>
-  ): void {
+  ): Promise<boolean> {
     const operation: PendingOperation = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       type,
@@ -46,11 +48,75 @@ class OfflineManager {
       retryCount: 0
     };
 
-    const queue = this.getQueue();
-    queue.operations.push(operation);
-    this.saveQueue(queue);
+    try {
+      const queue = this.getQueue();
+      
+      // Controlla quota prima di aggiungere
+      const quotaInfo = await StorageQuotaManager.checkQuota();
+      if (quotaInfo && quotaInfo.percentage > 0.9) { // 90%
+        console.warn('Quota storage alta, pulizia coda offline');
+        await this.cleanupOldOperations();
+      }
 
-    console.log(`Operazione ${type} su progetto ${projectId} aggiunta alla coda offline`);
+      queue.operations.push(operation);
+      
+      // Limita dimensione coda
+      if (queue.operations.length > 50) {
+        queue.operations = queue.operations.slice(-30); // Mantieni solo le ultime 30
+        console.warn('Coda offline troncata per gestione quota');
+      }
+
+      return await this.saveQueue(queue);
+    } catch (error) {
+      console.error('Errore salvataggio operazione offline:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Pulisce operazioni vecchie per liberare spazio
+   */
+  private async cleanupOldOperations(): Promise<void> {
+    const queue = this.getQueue();
+    const now = Date.now();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 ore
+
+    const validOperations = queue.operations.filter(op => {
+      const age = now - op.timestamp;
+      return age < maxAge && op.retryCount < this.MAX_RETRIES;
+    });
+
+    if (validOperations.length !== queue.operations.length) {
+      queue.operations = validOperations;
+      await this.saveQueue(queue);
+      console.log(`Pulizia coda offline: ${queue.operations.length - validOperations.length} operazioni rimosse`);
+    }
+  }
+
+  /**
+   * Salva la coda con gestione quota
+   */
+  private async saveQueue(queue: OfflineQueueState): Promise<boolean> {
+    try {
+      const queueData = JSON.stringify(queue);
+      const success = await StorageQuotaManager.safeLocalStorageSet(this.STORAGE_KEY, queueData);
+      
+      if (!success) {
+        console.error('Errore nel salvataggio della coda offline: quota superata');
+        // Tenta di salvare una versione ridotta
+        const reducedQueue = {
+          ...queue,
+          operations: queue.operations.slice(-10) // Solo ultime 10 operazioni
+        };
+        const reducedData = JSON.stringify(reducedQueue);
+        return await StorageQuotaManager.safeLocalStorageSet(this.STORAGE_KEY, reducedData);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Errore salvataggio coda offline:', error);
+      return false;
+    }
   }
 
   /**
@@ -229,14 +295,6 @@ class OfflineManager {
     } catch (error) {
       console.error('Errore nel caricamento della coda offline:', error);
       return { operations: [], isProcessing: false };
-    }
-  }
-
-  private saveQueue(queue: OfflineQueueState): void {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(queue));
-    } catch (error) {
-      console.error('Errore nel salvataggio della coda offline:', error);
     }
   }
 }

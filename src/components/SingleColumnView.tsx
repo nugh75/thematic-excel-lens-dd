@@ -45,14 +45,14 @@ const SingleColumnView = () => {
 
   // Ottieni metadati delle colonne con classificazioni
   const columnMetadata = currentProject?.config?.columnMetadata || [];
-  const columnsWithClassification = excelData.headers.map((header, index) => {
+  const columnsWithClassification = excelData?.headers?.map((header, index) => {
     const metadata = columnMetadata.find(meta => meta.index === index);
     return {
       index,
       name: header,
       classification: metadata?.classification
     };
-  });
+  }) || [];
 
   // Filtra e cerca colonne
   const filteredColumns = searchInClassifications(
@@ -63,14 +63,14 @@ const SingleColumnView = () => {
   // Raggruppa colonne per classificazione (per il dropdown)
   const groupedColumns = groupColumnsByClassification(columnsWithClassification);
 
-  const columnData = excelData.rows.map((row, index) => ({
+  const columnData = excelData?.rows?.map((row, index) => ({
     rowIndex: index,
     value: row[selectedColumn] || '',
     labels: cellLabels
       .filter(cl => cl.colIndex === selectedColumn && cl.rowIndex === index)
       .flatMap(cl => cl.labelIds.map(labelId => labels.find(l => l.id === labelId)))
       .filter(Boolean)
-  }));
+  })) || [];
 
   const visibleData = columnData.slice(startIndex, startIndex + itemsPerPage);
 
@@ -300,14 +300,14 @@ const SingleColumnView = () => {
             <div className="sticky top-0 bg-background border-b p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="font-semibold text-lg">{excelData.headers[selectedColumn]}</h2>
+                  <h2 className="font-semibold text-lg">{excelData?.headers?.[selectedColumn] || `Colonna ${selectedColumn + 1}`}</h2>
                   <ClassificationBadge 
                     classification={columnsWithClassification[selectedColumn]?.classification} 
                     variant="default"
                   />
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Colonna {selectedColumn + 1} di {excelData.headers.length}
+                  Colonna {selectedColumn + 1} di {excelData?.headers?.length || 0}
                 </div>
               </div>
             </div>
@@ -383,7 +383,7 @@ const SingleColumnView = () => {
 
       {/* Suggerimenti AI per la colonna */}
       <AISuggestions 
-        columnName={excelData.headers[selectedColumn]}
+        columnName={excelData?.headers?.[selectedColumn] || `Colonna ${selectedColumn + 1}`}
         responses={columnData.map(item => item.value)}
       />
 
@@ -401,10 +401,10 @@ const SingleColumnView = () => {
             {selectedCell && (
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium">
-                  Riga {selectedCell.row + 1}, Colonna: {excelData.headers[selectedCell.col]}
+                  Riga {selectedCell.row + 1}, Colonna: {excelData?.headers?.[selectedCell.col] || `Colonna ${selectedCell.col + 1}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Contenuto: "{excelData.rows[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
+                  Contenuto: "{excelData?.rows?.[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
                 </p>
               </div>
             )}

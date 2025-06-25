@@ -1,14 +1,23 @@
 /**
  * Servizio API per la persistenza dei dati sul server
- * Sostituisce il salvataggio locale nel browser con chiamate al backend
+ * Con gestione CORS, retry automatico e fallback offline
  */
 
-import { useState, useEffect } from 'react';
+import { StorageQuotaManager } from '../utils/storageQuotaManager';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+                   import.meta.env.VITE_API_URL || 
+                   'http://localhost:3001';
 
 interface ApiResponse<T> {
   [key: string]: T;
+}
+
+interface NetworkError extends Error {
+  code?: string;
+  status?: number;
+  isCorsError?: boolean;
+  isNetworkError?: boolean;
 }
 
 interface Project {
@@ -49,31 +58,83 @@ class ApiService {
 
   private async request<T>(
     endpoint: string, 
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries: number = 2
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...options.headers,
       },
+      mode: 'cors', // Abilita CORS esplicitamente
+      credentials: 'omit', // Non inviare cookies per evitare problemi CORS
       ...options,
     };
 
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP Error: ${response.status}`);
-      }
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      return await response.json();
-    } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
-      throw error;
+        const response = await fetch(url, {
+          ...config,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          
+          // Gestione errori specifici
+          if (response.status === 0) {
+            throw this.createNetworkError('CORS or Network Error', 0, true);
+          }
+          
+          throw new Error(errorData.error || `HTTP Error: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+        
+      } catch (error) {
+        const isLastAttempt = attempt === retries;
+        
+        if (error instanceof Error) {
+          // Gestione errori specifici
+          if (error.name === 'AbortError') {
+            if (isLastAttempt) {
+              throw this.createNetworkError('Request timeout', 408);
+            }
+          } else if (error.message.includes('CORS') || error.message.includes('fetch')) {
+            if (isLastAttempt) {
+              throw this.createNetworkError(error.message, 0, true, true);
+            }
+          } else if (isLastAttempt) {
+            throw error;
+          }
+        }
+        
+        // Attendi prima del retry (backoff exponential)
+        if (!isLastAttempt) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          console.warn(`API retry ${attempt + 1}/${retries} for ${endpoint}`);
+        }
+      }
     }
+    
+    throw this.createNetworkError('Max retries exceeded', 0);
+  }
+
+  private createNetworkError(message: string, status = 0, isCorsError = false, isNetworkError = false): NetworkError {
+    const error = new Error(message) as NetworkError;
+    error.code = 'NETWORK_ERROR';
+    error.status = status;
+    error.isCorsError = isCorsError;
+    error.isNetworkError = isNetworkError;
+    return error;
   }
 
   // ================== HEALTH CHECK ==================
@@ -229,27 +290,6 @@ export const handleApiError = (error: Error): string => {
     return 'Errore interno del server. Riprova più tardi.';
   }
   return error.message || 'Errore sconosciuto durante la comunicazione con il server.';
-};
-
-// Hook per verificare lo stato dell'API
-export const useApiStatus = () => {
-  const [isOnline, setIsOnline] = useState<boolean | null>(null);
-  const [lastCheck, setLastCheck] = useState<Date | null>(null);
-
-  useEffect(() => {
-    const checkStatus = async () => {
-      const online = await apiService.isOnline();
-      setIsOnline(online);
-      setLastCheck(new Date());
-    };
-
-    checkStatus();
-    const interval = setInterval(checkStatus, 30000); // Check ogni 30 secondi
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return { isOnline, lastCheck };
 };
 
 export default apiService;

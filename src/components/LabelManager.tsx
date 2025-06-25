@@ -16,7 +16,7 @@ export function LabelManager() {
   const { labels, excelData } = useAnalysisStore();
   const [activeTab, setActiveTab] = useState('manage');
 
-  const hasData = excelData && excelData.rows.length > 0;
+  const hasData = excelData && excelData?.rows?.length > 0;
 
   return (
     <div className="space-y-6">
@@ -54,7 +54,7 @@ export function LabelManager() {
                 <Target className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="font-medium">{hasData ? excelData.rows.length : 0}</p>
+                <p className="font-medium">{hasData ? excelData?.rows?.length || 0 : 0}</p>
                 <p className="text-sm text-muted-foreground">Righe Dati</p>
               </div>
             </div>

@@ -23,7 +23,7 @@ const colors = [
   '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
 ];
 
-  const DataGrid = () => {
+const DataGrid = () => {
   const { 
     excelData, 
     labels, 
@@ -36,7 +36,17 @@ const colors = [
     addLabel,
     currentProject
   } = useAnalysisStore();
-  
+
+  // Se non ci sono dati Excel, mostra placeholder
+  if (!excelData || !excelData.headers) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        Carica un progetto per visualizzare la tabella
+      </div>
+    );
+  }
+
+  // States per selezione e labeling
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [isLabelingOpen, setIsLabelingOpen] = useState(false);
@@ -55,23 +65,10 @@ const colors = [
 
   // Inizializza le colonne visibili quando i dati Excel cambiano
   React.useEffect(() => {
-    if (excelData && visibleColumns.length !== excelData.headers.length) {
+    if (excelData?.headers && visibleColumns.length !== excelData.headers.length) {
       setVisibleColumns(new Array(excelData.headers.length).fill(true));
     }
   }, [excelData]);
-
-  if (!excelData) {
-    return (
-      <Card className="w-full fade-in">
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="text-center text-muted-foreground">
-            <Grid className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Carica un file Excel per visualizzare i dati</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const handleColumnToggle = (index: number, visible: boolean) => {
     const newVisibleColumns = [...visibleColumns];
@@ -80,17 +77,21 @@ const colors = [
   };
 
   const handleSelectAllColumns = () => {
-    setVisibleColumns(new Array(excelData.headers.length).fill(true));
+    if (excelData?.headers) {
+      setVisibleColumns(new Array(excelData.headers.length).fill(true));
+    }
   };
 
   const handleDeselectAllColumns = () => {
-    setVisibleColumns(new Array(excelData.headers.length).fill(false));
+    if (excelData?.headers) {
+      setVisibleColumns(new Array(excelData.headers.length).fill(false));
+    }
   };
 
   // Filtra le colonne visibili e per classificazione avanzata
   const getFilteredColumns = () => {
-    if (!currentProject) {
-      return excelData.headers.map((_, index) => index);
+    if (!currentProject || !excelData?.headers) {
+      return [];
     }
     
     const columnMetadata = currentProject.config.columnMetadata;
@@ -123,10 +124,12 @@ const colors = [
   };
 
   const filteredColumnIndexes = getFilteredColumns();
-  const visibleHeaders = filteredColumnIndexes.map(index => excelData.headers[index]);
+  const visibleHeaders = excelData?.headers && filteredColumnIndexes.length > 0 
+    ? filteredColumnIndexes.map(index => excelData.headers[index])
+    : [];
 
   const getColumnClassification = (columnIndex: number) => {
-    if (!currentProject) {
+    if (!currentProject?.config?.columnMetadata) {
       return null;
     }
     const columnMeta = currentProject.config.columnMetadata.find(meta => meta.index === columnIndex);
@@ -252,7 +255,9 @@ const colors = [
 
   // Ottieni categorie disponibili per il filtro
   const getAvailableCategories = () => {
-    if (!currentProject) return [];
+    if (!currentProject?.config?.columnMetadata) {
+      return [];
+    }
     
     const columnMetadata = currentProject.config.columnMetadata;
     const categories = new Set<string>();
@@ -268,7 +273,9 @@ const colors = [
 
   // Ottieni statistiche dettagliate
   const getStats = () => {
-    if (!currentProject) return null;
+    if (!currentProject || !excelData?.headers) {
+      return null;
+    }
     
     const columnMetadata = currentProject.config.columnMetadata;
     const columnsWithClassification = excelData.headers.map((header, index) => {
@@ -294,20 +301,22 @@ const colors = [
 
   return (
     <>
-      <ColumnSelector
-        headers={excelData.headers}
-        visibleColumns={visibleColumns}
-        onColumnToggle={handleColumnToggle}
-        onSelectAll={handleSelectAllColumns}
-        onDeselectAll={handleDeselectAllColumns}
-      />
+      {excelData?.headers && (
+        <ColumnSelector
+          headers={excelData.headers}
+          visibleColumns={visibleColumns}
+          onColumnToggle={handleColumnToggle}
+          onSelectAll={handleSelectAllColumns}
+          onDeselectAll={handleDeselectAllColumns}
+        />
+      )}
 
       <Card className="w-full fade-in">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Grid className="h-6 w-6 text-primary" />
-              Dati Excel - {excelData.fileName}
+              Dati Excel - {excelData?.fileName || 'Nessun file'}
             </CardTitle>
             <div className="flex items-center gap-3">
               {currentProject && (
@@ -437,7 +446,7 @@ const colors = [
                     <TableHead key={colIndex} className="min-w-32">
                       <div className="space-y-1">
                         <div className="font-medium">
-                          {excelData.headers[colIndex] || `Colonna ${colIndex + 1}`}
+                          {excelData?.headers?.[colIndex] || `Colonna ${colIndex + 1}`}
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           {/* Mostra classificazione se abilitata e il progetto ha metadati */}
@@ -449,7 +458,7 @@ const colors = [
                             />
                           )}
                           
-                          {getColumnClassification(colIndex)?.subtype === 'aperta' && (
+                          {getColumnClassification(colIndex)?.subtype === 'aperta' && excelData?.headers && excelData?.rows && (
                             <AIQuickAccess
                               columnName={excelData.headers[colIndex]}
                               responses={excelData.rows.map(row => row[colIndex] || '').filter(v => v && typeof v === 'string' && v.trim())}
@@ -468,7 +477,7 @@ const colors = [
               </TableHeader>
               
               <TableBody>
-                {excelData.rows.map((row, rowIndex) => {
+                {excelData?.rows?.map((row, rowIndex) => {
                   const currentRowLabels = getRowLabels(rowIndex);
                   
                   return (
@@ -584,7 +593,7 @@ const colors = [
                     Riga {selectedCell.row + 1}, Colonna {selectedCell.col + 1}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Contenuto: "{excelData.rows[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
+                    Contenuto: "{excelData?.rows?.[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
                   </p>
                 </>
               ) : labelingType === 'row' && selectedRow !== null ? (

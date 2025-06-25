@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Shield } from 'lucide-react';
+import { Shield, Settings, AlertTriangle } from 'lucide-react';
 import NavigationHeader from '../components/NavigationHeader';
 import ExcelUploader from '../components/ExcelUploader';
 import LabelManager from '../components/LabelManager';
@@ -23,10 +22,12 @@ import SuggestionPanel from '../components/SuggestionPanel';
 import DataViewSelector from '../components/DataViewSelector';
 import SingleColumnView from '../components/SingleColumnView';
 import SingleRowView from '../components/SingleRowView';
-import ProjectManager from '../components/ProjectManager';
+import ProjectManagerNew from '../components/ProjectManager/ProjectManagerNew';
 import ColumnConfiguration from '../components/ColumnConfiguration';
+import SystemDiagnostic from '../components/SystemDiagnostic';
 import { LoadingIndicator, DataGridSkeleton } from '../components/LoadingIndicator';
 import { useAnalysisStore } from '../store/analysisStore';
+import { useApiConfig } from '../hooks/useApiConfig';
 
 const Analysis = () => {
   const { 
@@ -40,6 +41,7 @@ const Analysis = () => {
     projects,
     getServerProjects
   } = useAnalysisStore();
+  const { networkStatus, isHealthy } = useApiConfig();
   const [dataView, setDataView] = useState<'grid' | 'column' | 'row'>('grid');
   const [showAdvancedUserManager, setShowAdvancedUserManager] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -144,12 +146,12 @@ const Analysis = () => {
 
         {!excelData ? (
           <div className="space-y-6">
-            <ProjectManager />
+            <ProjectManagerNew />
             <ExcelUploader />
           </div>
         ) : (
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-8 gap-0.5">
+            <TabsList className="grid w-full grid-cols-9 gap-0.5">
               <TabsTrigger value="projects" className="text-xs px-1">Progetti</TabsTrigger>
               <TabsTrigger value="config" className="text-xs px-1">Config</TabsTrigger>
               <TabsTrigger value="data" className="text-xs px-1">Dati</TabsTrigger>
@@ -158,10 +160,11 @@ const Analysis = () => {
               <TabsTrigger value="ai-consultant" className="text-xs px-1">AI</TabsTrigger>
               <TabsTrigger value="users" className="text-xs px-1">Utenti</TabsTrigger>
               <TabsTrigger value="export" className="text-xs px-1">Export</TabsTrigger>
+              <TabsTrigger value="diagnostics" className="text-xs px-1">Diagnostica</TabsTrigger>
             </TabsList>
             
             <TabsContent value="projects" className="space-y-6">
-              <ProjectManager />
+              <ProjectManagerNew />
               <ExcelUploader />
             </TabsContent>
             
@@ -256,6 +259,10 @@ const Analysis = () => {
             
             <TabsContent value="export" className="space-y-6">
               <ExportManager />
+            </TabsContent>
+            
+            <TabsContent value="diagnostics" className="space-y-6">
+              <SystemDiagnostic />
             </TabsContent>
           </Tabs>
         )}

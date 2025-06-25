@@ -15,6 +15,17 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <script>
+      window.safeLocalStorageSet ??= function (k, v) {
+        try { localStorage.setItem(k, v); }
+        catch (e) { console.warn('offline queue drop', e); }
+      };
+    </script>
+    <script
+      src="/cf-beacon.min.js"
+      integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ=="
+      crossorigin="anonymous"
+    ></script>
   </head>
 
   <body>

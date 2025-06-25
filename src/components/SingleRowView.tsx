@@ -32,14 +32,14 @@ const SingleRowView = () => {
 
   if (!excelData) return null;
 
-  const rowData = excelData.headers.map((header, colIndex) => ({
+  const rowData = excelData?.headers?.map((header, colIndex) => ({
     header,
-    value: excelData.rows[selectedRow]?.[colIndex] || '',
+    value: excelData?.rows?.[selectedRow]?.[colIndex] || '',
     labels: cellLabels
       .filter(cl => cl.rowIndex === selectedRow && cl.colIndex === colIndex)
       .flatMap(cl => cl.labelIds.map(labelId => labels.find(l => l.id === labelId)))
       .filter(Boolean)
-  }));
+  })) || [];
 
   const rowLabelData = rowLabels
     .filter(rl => rl.rowIndex === selectedRow)
@@ -51,7 +51,7 @@ const SingleRowView = () => {
   };
 
   const handleNext = () => {
-    setSelectedRow(Math.min(excelData.rows.length - 1, selectedRow + 1));
+    setSelectedRow(Math.min((excelData?.rows?.length || 1) - 1, selectedRow + 1));
   };
 
   const handleCellClick = (colIndex: number) => {
@@ -172,11 +172,11 @@ const SingleRowView = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {excelData.rows.map((_, index) => (
+                  {excelData?.rows?.map((_, index) => (
                     <SelectItem key={index} value={index.toString()}>
                       Riga {index + 1}
                     </SelectItem>
-                  ))}
+                  )) || []}
                 </SelectContent>
               </Select>
               
@@ -193,7 +193,7 @@ const SingleRowView = () => {
                   variant="outline" 
                   size="sm"
                   onClick={handleNext}
-                  disabled={selectedRow >= excelData.rows.length - 1}
+                  disabled={selectedRow >= (excelData?.rows?.length || 1) - 1}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -296,10 +296,10 @@ const SingleRowView = () => {
               {labelingType === 'cell' && selectedCell ? (
                 <>
                   <p className="text-sm font-medium">
-                    Riga {selectedCell.row + 1}, Colonna: {excelData.headers[selectedCell.col]}
+                    Riga {selectedCell.row + 1}, Colonna: {excelData?.headers?.[selectedCell.col] || `Colonna ${selectedCell.col + 1}`}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Contenuto: "{excelData.rows[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
+                    Contenuto: "{excelData?.rows?.[selectedCell.row]?.[selectedCell.col] || 'Vuoto'}"
                   </p>
                 </>
               ) : labelingType === 'row' ? (
