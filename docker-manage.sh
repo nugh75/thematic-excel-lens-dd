@@ -57,11 +57,27 @@ setup_directories() {
 # Copia file di configurazione
 setup_config() {
     if [ ! -f ".env" ]; then
-        log_info "Copia del file di configurazione..."
-        cp .env.docker .env
-        log_warning "File .env creato da .env.docker. Modifica le configurazioni secondo le tue necessità."
+        log_info "Creazione file .env..."
+        cp .env.example .env
+        log_success "File .env creato con le credenziali preconfigurate"
     else
         log_info "File .env già esistente"
+    fi
+    
+    # Verifica base connettività database
+    if [ -f ".env" ]; then
+        log_info "Verifica connettività database PostgreSQL..."
+        source .env
+        
+        if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$POSTGRES_HOST/$POSTGRES_PORT" 2>/dev/null; then
+            log_success "Host database raggiungibile"
+        else
+            log_warning "Impossibile raggiungere l'host database. Verifica:"
+            log_warning "- Connessione di rete a $POSTGRES_HOST:$POSTGRES_PORT"
+            log_warning "- Firewall/regole di rete"
+            log_warning "- Stato del servizio PostgreSQL remoto"
+            log_warning "- Credenziali in .env"
+        fi
     fi
 }
 

@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SafeSelect } from '@/components/ui/SafeSelect';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -361,24 +362,30 @@ const LabelManagerAdvanced = () => {
                   Seleziona etichette da unire, poi scegli la destinazione:
                 </span>
                 
-                <Select value={targetLabelForMerge} onValueChange={setTargetLabelForMerge}>
+                <SafeSelect value={targetLabelForMerge} onValueChange={setTargetLabelForMerge}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Etichetta destinazione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {labels.filter(l => !selectedLabelsForMerge.includes(l.id)).map(label => (
-                      <SelectItem key={label.id} value={label.id}>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: label.color }}
-                          />
-                          {label.name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {labels.filter(l => !selectedLabelsForMerge.includes(l.id)).map(label => {
+                      if (!label.id) {
+                        console.error('Invalid label id:', label);
+                        return null;
+                      }
+                      return (
+                        <SelectItem key={label.id} value={label.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: label.color }}
+                            />
+                            {label.name}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
-                </Select>
+                </SafeSelect>
                 
                 <Button 
                   onClick={handleMergeLabels}
@@ -457,19 +464,25 @@ const LabelManagerAdvanced = () => {
                   {/* Filtro per tag */}
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
-                    <Select value={selectedTagFilter || ""} onValueChange={(value) => setSelectedTagFilter(value || "")}>
+                    <SafeSelect value={selectedTagFilter || ""} onValueChange={(value) => setSelectedTagFilter(value || "")}>
                       <SelectTrigger className="w-48">
                         <SelectValue placeholder="Filtra per categoria" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem key="all" value="all">Tutte le categorie</SelectItem>
-                        {TAG_PREDEFINITI.map(tag => (
-                          <SelectItem key={tag} value={tag}>
-                            {tag}
-                          </SelectItem>
-                        ))}
+                        {TAG_PREDEFINITI.map(tag => {
+                          if (!tag) {
+                            console.error('Invalid tag value:', tag);
+                            return null;
+                          }
+                          return (
+                            <SelectItem key={tag} value={tag}>
+                              {tag}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
-                    </Select>
+                    </SafeSelect>
                     {selectedTagFilter && selectedTagFilter !== "all" && (
                       <Button
                         variant="ghost"
