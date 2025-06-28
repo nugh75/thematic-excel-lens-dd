@@ -28,12 +28,6 @@ interface AnalysisStore extends ThematicAnalysis {
   clearAnalysis: () => void;
   getLabelStats: () => { [labelId: string]: number };
   
-  // User management
-  addUser: (user: Omit<User, 'id'>) => void;
-  setCurrentUser: (userId: string) => void;
-  removeUser: (userId: string) => void;
-  updateUser: (userId: string, updates: Partial<User>) => void;
-  
   // Project management methods
   createProject: (name: string, description: string, excelData: ExcelData) => void;
   loadProject: (projectId: string) => void;
@@ -71,15 +65,6 @@ interface AnalysisStore extends ThematicAnalysis {
   // Computed properties for easy access
   columnMetadata: ColumnMetadata[];
 }
-
-const defaultUser: User = {
-  id: 'default-user',
-  name: 'Utente Principale',
-  color: '#3B82F6',
-  isActive: true,
-  role: 'admin',
-  createdAt: Date.now(),
-};
 
 // Auto-detect column type based on header name and sample values
 const autoDetectColumnType = (headerName: string, sampleValues: string[]): ColumnType => {
@@ -173,8 +158,6 @@ export const useAnalysisStore = create<AnalysisStore>()(
       labels: [],
       cellLabels: [],
       rowLabels: [],
-      users: [defaultUser],
-      currentUser: defaultUser,
       sessions: [],
       currentSession: null,
       projects: [],
@@ -187,7 +170,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
       },
 
       setExcelData: (data) => {
-        const { currentUser, saveCurrentProject } = get();
+        const { saveCurrentProject } = get();
         
         // Salva il progetto corrente se esiste
         saveCurrentProject();
@@ -217,10 +200,10 @@ export const useAnalysisStore = create<AnalysisStore>()(
             isConfigured: false,
           },
           createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
+          createdBy: 'unknown',
           lastModified: Date.now(),
           isActive: true,
-          collaborators: [currentUser?.id || 'unknown'],
+          collaborators: ['unknown'],
           labels: [],
           cellLabels: [],
           rowLabels: [],
@@ -306,10 +289,9 @@ export const useAnalysisStore = create<AnalysisStore>()(
 
       addCellLabel: (cellLabel) => {
         set((state) => {
-          const currentUser = state.currentUser;
           const labelWithUser = {
             ...cellLabel,
-            userId: currentUser?.id,
+            userId: 'unknown',
             timestamp: Date.now(),
           };
 
@@ -351,10 +333,9 @@ export const useAnalysisStore = create<AnalysisStore>()(
 
       addRowLabel: (rowLabel) => {
         set((state) => {
-          const currentUser = state.currentUser;
           const labelWithUser = {
             ...rowLabel,
-            userId: currentUser?.id,
+            userId: 'unknown',
             timestamp: Date.now(),
           };
 
@@ -405,7 +386,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
 
       // Project management
       createProject: (name, description, excelData) => {
-        const { currentUser } = get();
+        const { saveCurrentProject } = get();
         
         // Auto-detect column types
         const columnMetadata: ColumnMetadata[] = excelData.headers.map((header, index) => {
@@ -431,10 +412,10 @@ export const useAnalysisStore = create<AnalysisStore>()(
             isConfigured: false,
           },
           createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
+          createdBy: 'unknown',
           lastModified: Date.now(),
           isActive: true,
-          collaborators: [currentUser?.id || 'unknown'],
+          collaborators: ['unknown'],
           labels: [],
           cellLabels: [],
           rowLabels: [],
@@ -546,7 +527,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
               columnMetadata,
               isConfigured: true,
               configuredAt: Date.now(),
-              configuredBy: get().currentUser?.id,
+              configuredBy: 'unknown',
             },
           };
 
@@ -617,19 +598,18 @@ export const useAnalysisStore = create<AnalysisStore>()(
           const updatedMetadata = currentProject.config.columnMetadata.map(col => {
             if (columnIndexes.includes(col.index)) {
               const updatedClassification: ColumnClassification = {
-                level1: classification.level1 || col.classification?.level1 || 'non_demographic',
-                level2: classification.level2 || col.classification?.level2,
-                level3: classification.level3 || col.classification?.level3,
-                finalType: classification.finalType || col.type,
+                type: classification.type || col.classification?.type || 'non_classificata',
+                subtype: classification.subtype || col.classification?.subtype,
+                category: classification.category || col.classification?.category,
                 confidence: classification.confidence || 90,
-                autoDetected: false,
                 classifiedAt: Date.now(),
-                classifiedBy: 'user'
+                classifiedBy: 'user',
+                aiGenerated: false, // Aggiunto aiGenerated
               };
 
               return {
                 ...col,
-                type: classification.finalType || col.type,
+                type: classification.type || col.type,
                 classification: updatedClassification,
                 autoDetected: false
               };
@@ -721,18 +701,17 @@ export const useAnalysisStore = create<AnalysisStore>()(
           .filter(col => columnIndexes.includes(col.index))
           .map(col => {
             const oldType = col.type;
-            const newType = classification.finalType || oldType;
+            const newType = classification.type || oldType;
             const oldClassification = col.classification;
             
             const newClassification: ColumnClassification = {
-              level1: classification.level1 || oldClassification?.level1 || 'non_demographic',
-              level2: classification.level2 || oldClassification?.level2,
-              level3: classification.level3 || oldClassification?.level3,
-              finalType: classification.finalType || oldType,
+              type: classification.type || oldClassification?.type || 'non_classificata',
+              subtype: classification.subtype || oldClassification?.subtype,
+              category: classification.category || oldClassification?.category,
               confidence: classification.confidence || 90,
-              autoDetected: false,
               classifiedAt: Date.now(),
-              classifiedBy: 'user'
+              classifiedBy: 'user',
+              aiGenerated: false, // Aggiunto aiGenerated
             };
             
             return {
@@ -783,45 +762,14 @@ export const useAnalysisStore = create<AnalysisStore>()(
         return stats;
       },
 
-      // User management
-      addUser: (userData) => {
-        const id = Date.now().toString();
-        const newUser: User = { ...userData, id };
-        set((state) => ({ users: [...state.users, newUser] }));
-      },
-
-      setCurrentUser: (userId) => {
-        set((state) => ({
-          currentUser: state.users.find(u => u.id === userId) || null,
-        }));
-      },
-
-      removeUser: (userId) => {
-        set((state) => ({
-          users: state.users.filter(u => u.id !== userId),
-          currentUser: state.currentUser?.id === userId ? null : state.currentUser,
-        }));
-      },
-
-      updateUser: (userId, updates) => {
-        set((state) => ({
-          users: state.users.map(u => 
-            u.id === userId ? { ...u, ...updates } : u
-          ),
-          currentUser: state.currentUser?.id === userId 
-            ? { ...state.currentUser, ...updates }
-            : state.currentUser,
-        }));
-      },
-
       // Session management
       createSession: (name) => {
-        const { cellLabels, rowLabels, labels, currentUser } = get();
+        const { cellLabels, rowLabels, labels } = get();
         const newSession: LabelingSession = {
           id: Date.now().toString(),
           name,
           createdAt: Date.now(),
-          createdBy: currentUser?.id || 'unknown',
+          createdBy: 'unknown',
           cellLabels: [...cellLabels],
           rowLabels: [...rowLabels],
           labels: [...labels],
@@ -874,7 +822,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
 
       // Conflict resolution
       getConflicts: () => {
-        const { cellLabels, rowLabels, users } = get();
+        const { cellLabels, rowLabels } = get();
         const conflicts: ConflictResolution[] = [];
         
         // Check for conflicting cell labels
@@ -925,9 +873,7 @@ export const useAnalysisStore = create<AnalysisStore>()(
       name: 'thematic-analysis-storage',
       partialize: (state) => ({
         ...state,
-        // Assicuriamoci che i dati critici vengano sempre salvati
-        currentUser: state.currentUser || defaultUser,
-        users: state.users.length > 0 ? state.users : [defaultUser],
+        // RIMOSSO: currentUser e users dalla persistenza
       }),
     }
   )

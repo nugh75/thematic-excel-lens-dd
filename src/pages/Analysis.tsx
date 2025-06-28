@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Shield } from 'lucide-react';
+import { Shield, AlertCircle } from 'lucide-react';
 import NavigationHeader from '../components/NavigationHeader';
 import ExcelUploader from '../components/ExcelUploader';
 import LabelManager from '../components/LabelManager';
@@ -37,8 +36,10 @@ const Analysis = () => {
   } = useAnalysisStore();
   const [dataView, setDataView] = useState<'grid' | 'column' | 'row'>('grid');
   const [showAdvancedUserManager, setShowAdvancedUserManager] = useState(false);
+  const [excelError, setExcelError] = useState<string | null>(null);
 
-  const currentUserData = users.find(u => u.id === currentUser?.id);
+  // Usa fallback sicuro per users
+  const currentUserData = (users ?? []).find(u => u.id === currentUser?.id);
   const isAdmin = currentUserData?.role === 'admin';
 
   // Show login screen if no user is logged in
@@ -74,10 +75,20 @@ const Analysis = () => {
     }
   };
 
+  // Mostra alert errore se presente
+  const renderExcelError = () => excelError ? (
+    <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded flex items-center gap-2">
+      <AlertCircle className="h-5 w-5 text-red-500" />
+      <span>{excelError}</span>
+      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setExcelError(null)}>Chiudi</Button>
+    </div>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <NavigationHeader />
       <div className="container mx-auto p-6">
+        {renderExcelError()}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -95,7 +106,7 @@ const Analysis = () => {
         {!excelData ? (
           <div className="space-y-6">
             <ProjectManager />
-            <ExcelUploader />
+            <ExcelUploader onExcelError={setExcelError} />
           </div>
         ) : (
           <Tabs defaultValue="data" className="w-full">

@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.API_PORT || 3001;
@@ -16,6 +18,9 @@ const pool = new Pool({
   port: process.env.POSTGRES_PORT,
 });
 
+const JWT_SECRET = process.env.JWT_SECRET || 'anatema_secret_key';
+const JWT_EXPIRES_IN = '8h';
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -24,6 +29,27 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK' });
 });
+
+// Middleware autenticazione
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Token mancante' });
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token non valido' });
+    req.user = user;
+    next();
+  });
+}
+
+// Middleware solo admin
+function requireAdmin(req, res, next) {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Permesso negato (solo admin)' });
+  }
+}
 
 // Endpoint per le etichette
 app.get('/api/labels', async (req, res) => {
@@ -54,33 +80,121 @@ app.post('/api/labels', async (req, res) => {
   }
 });
 
-// Endpoint per gli utenti
-app.get('/api/users', async (req, res) => {
-  console.log('GET /api/users chiamato');
+// Endpoint per aggiornare una etichetta
+app.put('/api/labels/:id', async (req, res) => {
+  console.log('PUT /api/labels/:id chiamato, dati:', req.body);
+  const { id } = req.params;
+  const { name, description, color } = req.body;
   try {
-    const result = await pool.query('SELECT * FROM users');
-    console.log('Risultato:', result.rows);
-    res.status(200).json(result.rows);
+    const result = await pool.query(
+      'UPDATE labels SET name = $1, description = $2, color = $3 WHERE id = $4 RETURNING *',
+      [name, description, color, id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Label not found' });
+    } else {
+      console.log('Label aggiornata:', result.rows[0]);
+      res.status(200).json(result.rows[0]);
+    }
   } catch (err) {
-    console.error('Error fetching users:', err);
+    console.error('Error updating label:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/users', async (req, res) => {
-  console.log('POST /api/users chiamato, dati:', req.body);
-  const { username, email, password_hash } = req.body;
+// Endpoint per cancellare una etichetta
+app.delete('/api/labels/:id', async (req, res) => {
+  console.log('DELETE /api/labels/:id chiamato, id:', req.params.id);
+  const { id } = req.params;
   try {
-    const result = await pool.query(
-      'INSERT INTO users (id, username, email, password_hash, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
-      [uuidv4(), username, email, password_hash]
-    );
-    console.log('Utente creato:', result.rows[0]);
-    res.status(201).json(result.rows[0]);
+    const result = await pool.query('DELETE FROM labels WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Label not found' });
+    } else {
+      console.log('Label cancellata:', result.rows[0]);
+      res.status(200).json(result.rows[0]);
+    }
   } catch (err) {
-    console.error('Error creating user:', err);
+    console.error('Error deleting label:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Endpoint per gli utenti
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  console.log('GET /api/users chiamato');
+  try {
+    const result = await pool.query('SELECT id, username, email, role, created_at FROM users');
+    res.status(200).json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Errore fetch utenti' });
+  }
+});
+
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  console.log('POST /api/users chiamato, dati:', req.body);
+  const { username, email, password, role } = req.body;
+  try {
+    const password_hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (id, username, email, password_hash, role, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, username, email, role, created_at',
+      [uuidv4(), username, email, password_hash, role || 'user']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Errore creazione utente' });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { username, email, password, role } = req.body;
+  try {
+    let password_hash;
+    if (password) {
+      password_hash = await bcrypt.hash(password, 10);
+    }
+    const result = await pool.query(
+      `UPDATE users SET username = $1, email = $2, role = $3${password ? ', password_hash = $4' : ''} WHERE id = $5 RETURNING id, username, email, role, created_at`,
+      password ? [username, email, role, password_hash, id] : [username, email, role, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Utente non trovato' });
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Errore modifica utente' });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, username, email, role, created_at', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Utente non trovato' });
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Errore eliminazione utente' });
+  }
+});
+
+// Login
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Utente non trovato' });
+    const user = result.rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Password errata' });
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, email: user.email } });
+  } catch (err) {
+    res.status(500).json({ error: 'Errore login' });
+  }
+});
+
+// Logout (dummy, lato client basta eliminare il token)
+app.post('/api/logout', (req, res) => {
+  res.json({ message: 'Logout ok' });
 });
 
 // Endpoint per i progetti
@@ -254,6 +368,16 @@ app.post('/api/excel_cells', async (req, res) => {
   } catch (err) {
     console.error('Error creating excel_cell:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Endpoint pubblico per la lista utenti (solo id e username)
+app.get('/api/public-users', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username FROM users ORDER BY username ASC');
+    res.status(200).json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Errore fetch utenti pubblici' });
   }
 });
 

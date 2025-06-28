@@ -1,0 +1,3 @@
+# TODO: Dipendenze per autenticazione e hashing
+# Da installare nel backend:
+# npm install bcrypt jsonwebtoken

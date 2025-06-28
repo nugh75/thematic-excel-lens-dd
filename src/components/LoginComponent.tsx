@@ -20,14 +20,15 @@ import {
   Clock,
   Key
 } from 'lucide-react';
-import { useAnalysisStore } from '../store/analysisStore';
 import { toast } from '@/hooks/use-toast';
 import { AuthService, authLimiter } from '../services/authService';
 import PasswordManager from './PasswordManager';
+import { useUser } from '../store/UserContext';
 
 const LoginComponent = () => {
-  const { users, currentUser, setCurrentUser, addUser, updateUser } = useAnalysisStore();
-  const [showLogin, setShowLogin] = useState(!currentUser);
+  const { user, login, logout } = useUser();
+  const [users, setUsers] = useState([]);
+  const [showLogin, setShowLogin] = useState(!user);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showPasswordManager, setShowPasswordManager] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -65,134 +66,43 @@ const LoginComponent = () => {
     }
   }, [selectedUserId]);
 
-  // Create default admin if no users exist
+  // Fetch utenti da API all'avvio, con gestione errori
   useEffect(() => {
-    const initializeDefaultAdmin = async () => {
-      if (users.length === 0) {
-        try {
-          const defaultAdmin = await AuthService.createDefaultAdmin();
-          addUser({
-            name: defaultAdmin.name,
-            email: defaultAdmin.email,
-            color: defaultAdmin.color,
-            role: defaultAdmin.role,
-            isActive: defaultAdmin.isActive,
-            createdAt: defaultAdmin.createdAt,
-            passwordHash: defaultAdmin.passwordHash
-          });
-          
-          toast({
-            title: "Amministratore predefinito creato",
-            description: `Username: ${defaultAdmin.name}, Password: ${defaultAdmin.password}`,
-            duration: 10000,
-          });
-        } catch (error) {
-          console.error('Errore nella creazione dell\'amministratore predefinito:', error);
-        }
-      }
-    };
-    
-    initializeDefaultAdmin();
-  }, [users.length, addUser]);
+    fetch('/api/users')
+      .then(res => res.json())
+      .then(data => setUsers(Array.isArray(data) ? data : []))
+      .catch(() => setUsers([]));
+  }, []);
 
+  // Login: chiama API, salva token e aggiorna context
   const handleLogin = async () => {
-    if (!selectedUserId) {
-      toast({
-        title: "Errore",
-        description: "Seleziona un utente per effettuare il login",
-        variant: "destructive",
-      });
+    if (!selectedUserId || !password) {
+      toast({ title: "Errore", description: "Seleziona utente e inserisci password", variant: "destructive" });
       return;
     }
-
-    const user = users.find(u => u.id === selectedUserId);
-    if (!user) {
-      toast({
-        title: "Errore",
-        description: "Utente non trovato",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check if user is locked out
-    if (!authLimiter.canAttempt(selectedUserId)) {
-      const remainingTime = Math.ceil(authLimiter.getRemainingLockoutTime(selectedUserId) / 1000 / 60);
-      toast({
-        title: "Account bloccato",
-        description: `Troppi tentativi falliti. Riprova tra ${remainingTime} minuti.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!password) {
-      toast({
-        title: "Errore",
-        description: "Inserisci la password",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
-
     try {
-      // Check if user has a password set
-      if (!user.passwordHash) {
-        toast({
-          title: "Password non impostata",
-          description: "Questo utente non ha una password. Imposta una password prima di continuare.",
-          variant: "destructive",
-        });
-        setPasswordManagerUser({ id: user.id, name: user.name });
-        setShowPasswordManager(true);
-        setIsLoading(false);
-        return;
-      }
-
-      // Verify password
-      const isValidPassword = await AuthService.verifyPassword(password, user.passwordHash);
-      
-      if (isValidPassword) {
-        authLimiter.recordSuccess(selectedUserId);
-        setCurrentUser(selectedUserId);
-        setShowLogin(false);
-        setPassword('');
-        setLoginAttempts(0);
-        
-        toast({
-          title: "Login effettuato",
-          description: `Benvenuto/a, ${user.name}!`,
-        });
-      } else {
-        authLimiter.recordFailure(selectedUserId);
-        setLoginAttempts(prev => prev + 1);
-        
-        toast({
-          title: "Errore",
-          description: "Password non corretta",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Errore",
-        description: "Errore durante l'autenticazione",
-        variant: "destructive",
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUserId, password })
       });
+      if (!res.ok) throw new Error('Login fallito');
+      const { token, user } = await res.json();
+      login(token, user);
+      setShowLogin(false);
+      setPassword('');
+      toast({ title: "Login effettuato", description: `Benvenuto/a, ${user.name}!` });
+    } catch (e) {
+      toast({ title: "Errore", description: "Login fallito", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     if (!newUserName.trim()) {
-      toast({
-        title: "Errore",
-        description: "Il nome utente è obbligatorio",
-        variant: "destructive",
-      });
+      toast({ title: "Errore", description: "Il nome utente è obbligatorio", variant: "destructive" });
       return;
     }
 
@@ -221,21 +131,26 @@ const LoginComponent = () => {
       createdAt: Date.now(),
     };
 
-    addUser(newUser);
-
-    toast({
-      title: "Utente creato",
-      description: `Utente "${newUserName}" creato. Ora imposta una password.`,
-    });
-
-    // Find the newly created user and open password manager
-    setTimeout(() => {
-      const createdUser = users.find(u => u.name === newUserName.trim());
-      if (createdUser) {
-        setPasswordManagerUser({ id: createdUser.id, name: createdUser.name });
-        setShowPasswordManager(true);
-      }
-    }, 100);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newUserName.trim(),
+          email: newUserEmail.trim() || undefined,
+          color: newUserColor,
+          role: newUserRole,
+          isActive: true
+        })
+      });
+      if (!res.ok) throw new Error('Errore creazione utente');
+      toast({ title: "Utente creato", description: `Utente "${newUserName}" creato. Ora imposta una password.` });
+      // Aggiorna lista utenti
+      const updated = await fetch('/api/users').then(r => r.json());
+      setUsers(Array.isArray(updated) ? updated : []);
+    } catch (e) {
+      toast({ title: "Errore", description: "Errore creazione utente", variant: "destructive" });
+    }
 
     // Reset form
     setNewUserName('');
@@ -247,7 +162,7 @@ const LoginComponent = () => {
 
   const handlePasswordSet = (hashedPassword: string) => {
     if (passwordManagerUser) {
-      updateUser(passwordManagerUser.id, { passwordHash: hashedPassword });
+      // updateUser(passwordManagerUser.id, { passwordHash: hashedPassword });
       setPasswordManagerUser(null);
       
       toast({
@@ -258,7 +173,7 @@ const LoginComponent = () => {
   };
 
   const handleLogout = () => {
-    setCurrentUser('');
+    logout();
     setShowLogin(true);
     toast({
       title: "Logout effettuato",
@@ -305,29 +220,32 @@ const LoginComponent = () => {
     }
   };
 
-  if (currentUser) {
-    const user = users.find(u => u.id === currentUser.id);
-    if (!user) {
+  // Fallback sicuro per users
+  const safeUsers = users ?? [];
+
+  if (user) {
+    const loggedInUser = safeUsers.find(u => u.id === user.id);
+    if (!loggedInUser) {
       return null;
     }
 
     return (
       <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <Avatar className="h-10 w-10">
-          <AvatarFallback style={{ backgroundColor: user.color + '20', color: user.color }}>
-            {user.name.charAt(0).toUpperCase()}
+          <AvatarFallback style={{ backgroundColor: loggedInUser.color + '20', color: loggedInUser.color }}>
+            {loggedInUser.name.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-medium">{user.name}</span>
-            <Badge className={`gap-1 text-xs ${getRoleColor(user.role || 'annotator')}`}>
-              {getRoleIcon(user.role || 'annotator')}
-              {user.role || 'annotator'}
+            <span className="font-medium">{loggedInUser.name}</span>
+            <Badge className={`gap-1 text-xs ${getRoleColor(loggedInUser.role || 'annotator')}`}>
+              {getRoleIcon(loggedInUser.role || 'annotator')}
+              {loggedInUser.role || 'annotator'}
             </Badge>
           </div>
-          {user.email && (
-            <p className="text-sm text-gray-600">{user.email}</p>
+          {loggedInUser.email && (
+            <p className="text-sm text-gray-600">{loggedInUser.email}</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -335,7 +253,7 @@ const LoginComponent = () => {
             variant="outline" 
             size="sm" 
             onClick={() => {
-              setPasswordManagerUser({ id: user.id, name: user.name });
+              setPasswordManagerUser({ id: loggedInUser.id, name: loggedInUser.name });
               setShowPasswordManager(true);
             }}
           >
@@ -390,7 +308,7 @@ const LoginComponent = () => {
                 <SelectValue placeholder="Scegli un utente..." />
               </SelectTrigger>
               <SelectContent>
-                {users.map((user) => (
+                {safeUsers.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
@@ -430,7 +348,7 @@ const LoginComponent = () => {
               className="mt-1"
               disabled={lockoutTime > 0}
             />
-            {users.length > 0 && users.some(u => !u.passwordHash) && (
+            {safeUsers.length > 0 && safeUsers.some(u => !u.passwordHash) && (
               <p className="text-xs text-orange-600 mt-1">
                 ⚠️ Alcuni utenti non hanno una password impostata. Clicca su "Imposta Password" dopo la creazione.
               </p>
@@ -464,7 +382,7 @@ const LoginComponent = () => {
             </Button>
           </div>
 
-          {users.length === 0 && (
+          {safeUsers.length === 0 && (
             <div className="text-center py-4">
               <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-600">Nessun utente disponibile</p>

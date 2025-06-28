@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,11 @@ import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { ExcelData } from '../types/analysis';
 
-const ExcelUploader = () => {
+interface ExcelUploaderProps {
+  onExcelError?: (msg: string) => void;
+}
+
+const ExcelUploader = ({ onExcelError }: ExcelUploaderProps) => {
   const { setExcelData, currentProject, projects, createProject } = useAnalysisStore();
   const [pendingFile, setPendingFile] = useState<{ data: ExcelData; file: File } | null>(null);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
@@ -21,7 +24,6 @@ const ExcelUploader = () => {
 
   const processExcelFile = useCallback((file: File) => {
     const reader = new FileReader();
-    
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
@@ -32,11 +34,9 @@ const ExcelUploader = () => {
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
         
         if (jsonData.length === 0) {
-          toast({
-            title: "Errore",
-            description: "Il file Excel è vuoto",
-            variant: "destructive",
-          });
+          const msg = "Il file Excel è vuoto";
+          toast({ title: "Errore", description: msg, variant: "destructive" });
+          onExcelError?.(msg);
           return;
         }
 
@@ -64,16 +64,14 @@ const ExcelUploader = () => {
         }
       } catch (error) {
         console.error('Errore nel processare il file Excel:', error);
-        toast({
-          title: "Errore",
-          description: "Errore nel processare il file Excel",
-          variant: "destructive",
-        });
+        const msg = "Errore nel processare il file Excel";
+        toast({ title: "Errore", description: msg, variant: "destructive" });
+        onExcelError?.(msg);
       }
     };
 
     reader.readAsArrayBuffer(file);
-  }, [setExcelData, currentProject, projects]);
+  }, [setExcelData, currentProject, projects, onExcelError]);
 
   const handleCreateProject = () => {
     if (!pendingFile) return;
